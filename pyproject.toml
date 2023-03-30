@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "pygeoapi-prefect"
+version = "0.1.0"
+description = ""
+authors = ["Geobeyond <info@geobeyond.it>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "pygeoapi_prefect", from = "src"}
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pygeoapi = "^0.14.0"
+pydantic = "^1.10.7"
+prefect = "^2.8.7"
+
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.11.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
