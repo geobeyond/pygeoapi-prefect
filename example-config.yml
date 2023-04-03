@@ -72,4 +72,4 @@ resources:
   hi-prefect-world:
     type: process
     processor:
-      name: pygeoapi_prefect.process.hi_prefect_world.HiPrefectWorldProcessor
+      name: pygeoapi_prefect.examples.hi_prefect_world.HiPrefectWorldProcessor

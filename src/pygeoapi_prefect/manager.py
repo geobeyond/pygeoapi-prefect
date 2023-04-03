@@ -73,7 +73,7 @@ class PrefectManager(BaseManager):
         match p:
             case BasePrefectProcessor():
                 LOGGER.warning("This is a BasePrefectProcessor subclass")
-                media_type, outputs = p.process_flow(p.process_metadata, **data_dict)
+                media_type, outputs = p.execute(job_id, data_dict)
                 status = JobStatus.successful
             case _:
                 LOGGER.warning("This is a standard process")

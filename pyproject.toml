@@ -11,13 +11,18 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pygeoapi = "^0.14.0"
 pydantic = "^1.10.7"
-prefect = "^2.8.7"
+prefect = "^2.9.0"
+click = "8.0.0"  # this version is fixed in order to be compatible with upstream pygeoapi
+pygeoapi = {path = "../../pygeoapi", develop = true}
 
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.11.0"
+s3fs = "2023.1.0"
+
+[tool.poetry.scripts]
+pygeoapi-prefect = "pygeoapi_prefect.cli:root"
 
 [build-system]
 requires = ["poetry-core"]

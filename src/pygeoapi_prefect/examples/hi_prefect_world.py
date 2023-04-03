@@ -12,22 +12,25 @@ This module contains:
 import logging
 
 from prefect import flow
-from prefect.deployments import Deployment
-from .base import BasePrefectProcessor
 
-from .. import schemas
+from pygeoapi_prefect import schemas
+from pygeoapi_prefect.process.base import BasePrefectProcessor
 
 LOGGER = logging.getLogger(__name__)
 
+RESULT_OUTPUT_MEDIA_TYPE = "application/json"
 
-@flow
+
+@flow(
+    flow_run_name="hi_prefect_world_job_{pygeoapi_job_id}"
+)
 def hi_prefect_world(
-        process: schemas.Process, name: str, message: str | None
+        pygeoapi_job_id: str, name: str, message: str | None = None
 ) -> tuple[str, dict[str, str]]:
     """Echo back a greeting message."""
     LOGGER.warning(f"Inside the hi_prefect_world flow - locals: {locals()}")
     result = f"Hi from prefect {name}{f' - {message}' if message is not None else ''}"
-    return process.outputs["result"].schema_.content_media_type, {"result": result}
+    return RESULT_OUTPUT_MEDIA_TYPE, {"result": result}
 
 
 class HiPrefectWorldProcessor(BasePrefectProcessor):
@@ -61,7 +64,7 @@ class HiPrefectWorldProcessor(BasePrefectProcessor):
             "result": schemas.ProcessOutput(
                 schema=schemas.ProcessIOSchema(
                     type=schemas.ProcessIOType.OBJECT,
-                    contentMediaType="application/json"
+                    contentMediaType=RESULT_OUTPUT_MEDIA_TYPE
                 )
             )
         },
@@ -73,11 +76,3 @@ class HiPrefectWorldProcessor(BasePrefectProcessor):
         ],
         example={"inputs": {"message": "wazzaaaap!"}}
     )
-
-
-def deploy_flow():
-    deployment = Deployment.build_from_flow(
-        hi_prefect_world,
-        name="pygeoapi-process-hi-prefect-world"
-    )
-    deployment.apply()
