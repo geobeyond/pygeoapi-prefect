@@ -149,7 +149,7 @@ info:
     url: https://creativecommons.org/licenses/by/4.0/
   termsOfService: https://creativecommons.org/licenses/by/4.0/
   title: pygeoapi default instance
-  version: 0.14.0
+  version: 0.15.dev0
   x-keywords:
   - geospatial
   - data

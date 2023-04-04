@@ -22,7 +22,7 @@ RESULT_OUTPUT_MEDIA_TYPE = "application/json"
 
 
 @flow(
-    flow_run_name="hi_prefect_world_job_{pygeoapi_job_id}"
+    flow_run_name="pygeoapi-job-{pygeoapi_job_id}"
 )
 def hi_prefect_world(
         pygeoapi_job_id: str, name: str, message: str | None = None
@@ -41,7 +41,10 @@ class HiPrefectWorldProcessor(BasePrefectProcessor):
         version="0.0.1",
         title={"en": "Hi prefect world Processor"},
         description={"en": "An example processor that is created with pydantic"},
-        jobControlOptions=[schemas.ProcessJobControlOption.SYNC_EXECUTE],
+        jobControlOptions=[
+            schemas.ProcessJobControlOption.SYNC_EXECUTE,
+            schemas.ProcessJobControlOption.ASYNC_EXECUTE,
+        ],
         outputTransmission=[schemas.ProcessOutputTransmissionMode.VALUE],
         inputs={
             "name": schemas.ProcessInput(

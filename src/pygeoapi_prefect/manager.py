@@ -15,13 +15,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 class PrefectManager(BaseManager):
-    is_async: bool = True
+    is_async: bool
     name: str
     connection: str
     output_dir: Path | None
 
     def __init__(self, manager_def: dict[str, str]):
         super().__init__(manager_def)
+        self.is_async = True
 
     def get_jobs(self, status: JobStatus = None) -> list[dict]:
         """Get a list of jobs, optionally filtered by status."""
@@ -65,7 +66,7 @@ class PrefectManager(BaseManager):
           `pygeoapi_prefect.processes.base.BasePrefectProcessor`. These are able to take
           full advantage of prefect's features
         """
-        LOGGER.debug(f"inside manager.execute_process - locals: {locals()}")
+        LOGGER.warning(f"inside manager.execute_process - locals: {locals()}")
         # set initial status
         # add job (if needed)
         # request execution
@@ -73,8 +74,8 @@ class PrefectManager(BaseManager):
         match p:
             case BasePrefectProcessor():
                 LOGGER.warning("This is a BasePrefectProcessor subclass")
-                media_type, outputs = p.execute(job_id, data_dict)
-                status = JobStatus.successful
+                media_type, outputs, status = p.execute(
+                    job_id, data_dict, process_async=is_async)
             case _:
                 LOGGER.warning("This is a standard process")
                 executor = flow(
