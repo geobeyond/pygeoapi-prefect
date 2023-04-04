@@ -73,3 +73,9 @@ resources:
     type: process
     processor:
       name: pygeoapi_prefect.examples.hi_prefect_world.HiPrefectWorldProcessor
+      prefect:
+        deployment:
+          name: minio
+          queue: test
+          storage-block: remote-file-system/test-sb1
+          storage-path: hi-prefect-world-flow

@@ -15,19 +15,13 @@ def root():
 @root.command()
 @click.argument("process_id")
 @click.option("-c", "--pygeoapi-config", type=Path, envvar="PYGEOAPI_CONFIG")
-@click.option("-q", "--prefect-queue-name", default="test")
-@click.option("-n", "--deployment-name", default="test")
-@click.option("-s", "--storage-block-name")
-@click.option("-p", "--storage-sub-path")
-def deploy_process_as_flow(
+def deploy_process(
         process_id: str,
         pygeoapi_config: Path,
-        prefect_queue_name: str,
-        deployment_name: str,
-        storage_block_name: str | None,
-        storage_sub_path: str | None,
 ):
-    """Create and apply prefect deployment for PROCESS_ID."""
+    """Create and apply prefect deployment for PROCESS_ID.
+
+    Configure deployment parameters for the process in pygeoapi's configuration file."""
     with pygeoapi_config.open() as fh:
         config = yaml.safe_load(fh)
     try:
@@ -43,13 +37,25 @@ def deploy_process_as_flow(
                 processor = load_plugin("process", process_definition)
                 match processor:
                     case BasePrefectProcessor():
-                        print(f"Deploying process {process_id!r} with prefect...")
-                        processor.deploy_as_prefect_flow(
-                            queue_name=prefect_queue_name,
-                            deployment_name=deployment_name,
-                            storage_block_name=storage_block_name,
-                            storage_sub_path=storage_sub_path,
-                        )
+                        try:
+                            deployment_config = process_definition.get(
+                                "prefect", {})["deployment"]
+                            deployment_name = deployment_config["name"]
+                            prefect_queue_name = deployment_config.get("queue", "test")
+                            storage_block_name = deployment_config.get("storage-block")
+                            storage_sub_path = deployment_config.get("storage-path")
+                        except KeyError:
+                            raise click.Abort(
+                                "Deployment not specified in pygeoapi config file")
+                        else:
+                            print(f"Deploying process {process_id!r} with prefect...")
+                            processor.deploy_as_prefect_flow(
+                                queue_name=prefect_queue_name,
+                                deployment_name=deployment_name,
+                                storage_block_name=storage_block_name,
+                                storage_sub_path=storage_sub_path,
+                            )
+                            print("Done!")
                     case _:
                         print(
                             f"Process {process_id!r} is not deployable with "
