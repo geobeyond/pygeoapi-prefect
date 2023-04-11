@@ -1,17 +1,44 @@
 """pygeoapi process manager based on Prefect."""
 
 import logging
+import uuid
+from os import environ
 from pathlib import Path
 from typing import Any
 
+import anyio
 from prefect import flow
+from prefect.client.orchestration import get_client
+from prefect.server.schemas import filters
+from pygeoapi.plugin import load_plugin
 from pygeoapi.process.base import BaseProcessor
 from pygeoapi.process.manager.base import BaseManager
-from pygeoapi.util import JobStatus
+from pygeoapi.util import (
+    JobStatus,
+    yaml_load
+)
 
 from .process.base import BasePrefectProcessor
+from . import schemas
 
 LOGGER = logging.getLogger(__name__)
+
+
+async def _get_prefect_flow_runs(tags: list[str] | None = None):
+    async with get_client() as client:
+        response = await client.read_flow_runs(
+            flow_run_filter=filters.FlowRunFilter(
+                tags=filters.FlowRunFilterTags(all_=tags)
+            )
+        )
+    return response
+
+
+async def _get_prefect_flow_run(flow_run_id: uuid.UUID):
+    async with get_client() as client:
+        flow_run = await client.read_flow_run(flow_run_id)
+        flow = await client.read_flow(flow_run.flow_id)
+        return flow_run, flow
 
 
 class PrefectManager(BaseManager):
@@ -26,11 +53,30 @@ class PrefectManager(BaseManager):
 
     def get_jobs(self, status: JobStatus = None) -> list[dict]:
         """Get a list of jobs, optionally filtered by status."""
-        return []
+        flow_runs = anyio.run(_get_prefect_flow_runs, ["pygeoapi"])
+        return [fl.id for fl in flow_runs]
 
     def get_job(self, job_id: str) -> dict | None:
         """Get a job."""
-        return None
+        flow_run, flow = anyio.run(_get_prefect_flow_run, uuid.UUID(job_id))
+        # FIXME: it would be cleaner to be given the relevant process config at initialization time
+        pygeoapi_config_path = Path(environ.get("PYGEOAPI_CONFIG"))
+        with pygeoapi_config_path.open() as fh:
+            pygeoapi_config = yaml_load(fh)
+        process_config = pygeoapi_config["resources"][flow.name]["processor"]
+        process = load_plugin("process", process_config)
+        job = schemas.Job(
+            identifier=job_id,
+            process_id=flow.name,
+            status=None,
+            location=None,
+            mimetype=process.process_metadata.outputs["result"].schema_.content_media_type,
+            job_start_datetime=flow_run.start_time,
+            job_end_datetime=flow_run.end_time,
+            message=None,
+            progress=None,
+        )
+        return flow_run, flow, process
 
     def add_job(self, job_metadata: dict) -> str:
         """Add a job."""
