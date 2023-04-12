@@ -2,43 +2,24 @@
 
 import logging
 import uuid
-from os import environ
 from pathlib import Path
 from typing import Any
 
 import anyio
 from prefect import flow
 from prefect.client.orchestration import get_client
+from prefect.client.schemas import FlowRun
 from prefect.server.schemas import filters
-from pygeoapi.plugin import load_plugin
+from prefect.server.schemas.core import Flow
+from prefect.server.schemas.states import StateType
 from pygeoapi.process.base import BaseProcessor
 from pygeoapi.process.manager.base import BaseManager
-from pygeoapi.util import (
-    JobStatus,
-    yaml_load
-)
+from pygeoapi.util import JobStatus
 
 from .process.base import BasePrefectProcessor
 from . import schemas
 
 LOGGER = logging.getLogger(__name__)
-
-
-async def _get_prefect_flow_runs(tags: list[str] | None = None):
-    async with get_client() as client:
-        response = await client.read_flow_runs(
-            flow_run_filter=filters.FlowRunFilter(
-                tags=filters.FlowRunFilterTags(all_=tags)
-            )
-        )
-    return response
-
-
-async def _get_prefect_flow_run(flow_run_id: uuid.UUID):
-    async with get_client() as client:
-        flow_run = await client.read_flow_run(flow_run_id)
-        flow = await client.read_flow(flow_run.flow_id)
-        return flow_run, flow
 
 
 class PrefectManager(BaseManager):
@@ -47,44 +28,48 @@ class PrefectManager(BaseManager):
     connection: str
     output_dir: Path | None
 
+    prefect_state_map = {
+        StateType.SCHEDULED: JobStatus.accepted,
+        StateType.PENDING: JobStatus.accepted,
+        StateType.RUNNING: JobStatus.running,
+        StateType.COMPLETED: JobStatus.successful,
+        StateType.FAILED: JobStatus.failed,
+        StateType.CANCELLED: JobStatus.dismissed,
+        StateType.CRASHED: JobStatus.failed,
+        StateType.PAUSED: JobStatus.accepted,
+        StateType.CANCELLING: JobStatus.dismissed,
+    }
+
     def __init__(self, manager_def: dict[str, str]):
         super().__init__(manager_def)
         self.is_async = True
 
     def get_jobs(self, status: JobStatus = None) -> list[dict]:
         """Get a list of jobs, optionally filtered by status."""
-        flow_runs = anyio.run(_get_prefect_flow_runs, ["pygeoapi"])
-        return [fl.id for fl in flow_runs]
+        prefect_state = None
+        if status is not None:
+            for k, v in self.prefect_state_map.items():
+                if status == v:
+                    prefect_state = k
+                    break
+        flow_runs = anyio.run(
+            _get_prefect_flow_runs, prefect_state, ["pygeoapi"])
+        seen_flows = {}
+        jobs = []
+        for flow_run in flow_runs:
+            if flow_run.flow_id not in seen_flows:
+                flow = anyio.run(_get_prefect_flow, flow_run.flow_id)
+                seen_flows[flow_run.flow_id] = flow
+            job_status = self._flow_run_to_job_status(
+                flow_run, seen_flows[flow_run.flow_id])
+            jobs.append(job_status.dict(by_alias=True))
+        return jobs
 
     def get_job(self, job_id: str) -> dict | None:
         """Get a job."""
         flow_run, flow = anyio.run(_get_prefect_flow_run, uuid.UUID(job_id))
-        # FIXME: it would be cleaner to be given the relevant process config at initialization time
-        pygeoapi_config_path = Path(environ.get("PYGEOAPI_CONFIG"))
-        with pygeoapi_config_path.open() as fh:
-            pygeoapi_config = yaml_load(fh)
-        process_config = pygeoapi_config["resources"][flow.name]["processor"]
-        process = load_plugin("process", process_config)
-        job = schemas.Job(
-            identifier=job_id,
-            process_id=flow.name,
-            status=None,
-            location=None,
-            mimetype=process.process_metadata.outputs["result"].schema_.content_media_type,
-            job_start_datetime=flow_run.start_time,
-            job_end_datetime=flow_run.end_time,
-            message=None,
-            progress=None,
-        )
-        return flow_run, flow, process
-
-    def add_job(self, job_metadata: dict) -> str:
-        """Add a job."""
-        ...
-
-    def update_job(self, job_id: str, update_dict: dict) -> bool:
-        """Update an existing job."""
-        ...
+        job_status_info = self._flow_run_to_job_status(flow_run, flow)
+        return job_status_info.dict(by_alias=True)
 
     def get_job_result(self, job_id: str) -> tuple[str, Any]:
         """Returns the actual output from a completed process."""
@@ -112,11 +97,6 @@ class PrefectManager(BaseManager):
           `pygeoapi_prefect.processes.base.BasePrefectProcessor`. These are able to take
           full advantage of prefect's features
         """
-        LOGGER.warning(f"inside manager.execute_process - locals: {locals()}")
-        # set initial status
-        # add job (if needed)
-        # request execution
-
         match p:
             case BasePrefectProcessor():
                 LOGGER.warning("This is a BasePrefectProcessor subclass")
@@ -137,3 +117,69 @@ class PrefectManager(BaseManager):
                 media_type, outputs = executor(data_dict)
                 status = JobStatus.successful
         return media_type, outputs, status
+
+    def add_job(self, job_metadata: dict) -> str:
+        """Add a job.
+
+        This method is part of the ``pygeoapi.BaseManager`` API. However, in
+        the context of prefect we do not need it.
+        """
+        raise NotImplementedError
+
+    def update_job(self, job_id: str, update_dict: dict) -> bool:
+        """Update an existing job.
+
+        This method is part of the ``pygeoapi.BaseManager`` API. However, in
+        the context of prefect we do not need it.
+        """
+        raise NotImplementedError
+
+    def _flow_run_to_job_status(
+            self,
+            flow_run: FlowRun,
+            prefect_flow: Flow
+    ) -> schemas.JobStatusInfo:
+        return schemas.JobStatusInfo(
+            jobID=str(flow_run.id),
+            status=self.prefect_state_map[flow_run.state_type],
+            processID=prefect_flow.name,
+            created=flow_run.created,
+            started=flow_run.start_time,
+            finished=flow_run.end_time,
+        )
+
+
+async def _get_prefect_flow_runs(
+        state: StateType | None = None,
+        tags: list[str] | None = None
+) -> list[FlowRun]:
+    if state is not None:
+        state_filter = filters.FlowRunFilterState(
+            type=filters.FlowRunFilterStateType(any_=[state]))
+    else:
+        state_filter = None
+    if tags is not None:
+        tags_filter = filters.FlowRunFilterTags(all_=tags)
+    else:
+        tags_filter = None
+    async with get_client() as client:
+        response = await client.read_flow_runs(
+            flow_run_filter=filters.FlowRunFilter(
+                tags=tags_filter,
+                state=state_filter
+            )
+        )
+    return response
+
+
+async def _get_prefect_flow_run(
+        flow_run_id: uuid.UUID) -> tuple[FlowRun, Flow]:
+    async with get_client() as client:
+        flow_run = await client.read_flow_run(flow_run_id)
+        prefect_flow = await client.read_flow(flow_run.flow_id)
+        return flow_run, prefect_flow
+
+
+async def _get_prefect_flow(flow_id: uuid.UUID) -> Flow:
+    async with get_client() as client:
+        return await client.read_flow(flow_id)

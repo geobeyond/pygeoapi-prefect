@@ -70,9 +70,9 @@ class ProcessOutputTransmissionMode(enum.Enum):
 
 
 class ProcessMetadata(pydantic.BaseModel):
-    title: str | None
-    role: str | None
-    href: str | None
+    title: str | None = None
+    role: str | None = None
+    href: str | None = None
 
 
 class AdditionalProcessIOParameters(ProcessMetadata):
@@ -155,19 +155,48 @@ class Process(pydantic.BaseModel):
     example: typing.Optional[dict]
 
 
-class Job(pydantic.BaseModel):
-    # these properties are based on investigation of pygeoapi.process.manager.tinydb
-    identifier: str
-    process_id: str
+class AdditionalParameter(pydantic.BaseModel):
+    name: str
+    value: list[str | int | float | list[pydantic.Json] | pydantic.Json]
+
+
+class AdditionalParameters(ProcessMetadata):
+    parameters: list[AdditionalParameter]
+
+
+class ProcessSummary(pydantic.BaseModel):
+    """OAPI - Processes. Schema for a ProcessSummary."""
+    # definition from ProcessSummary
+    id: str
+    version: str
+    job_control_options: list[ProcessJobControlOption] | None = pydantic.Field(
+        None, alias="jobControlOptions")
+    output_transmission: list[ProcessOutputTransmissionMode] | None = pydantic.Field(
+        None, alias="outputTransmission")
+    links: list[Link] | None = None
+
+    # definition from descriptionType
+    title: dict[str, str] | None = None
+    description: dict[str, str] | None = None
+    keywords: list[str] | None = None
+    metadata: list[ProcessMetadata] | None = None
+    additional_parameters: AdditionalParameters | None = pydantic.Field(
+        None, alias="additionalParameters")
+
+
+class JobStatusInfo(pydantic.BaseModel):
+    """OAPI - Processes. Schema for a StatusInfo."""
+    job_id: str = pydantic.Field(..., alias="jobID")
     status: JobStatus
-    location: Path
-    mimetype: str
-    # these properties are based on investigation of pygeoapi.api.API
-    job_start_datetime: dt.datetime
-    job_end_datetime: dt.datetime
-    message: str
-    progress: float
-    # parameters: ?
+    type: typing.Literal["process"] = "process"
+    process_id: str = pydantic.Field(..., alias="processID")
+    message: str | None
+    created: dt.datetime | None
+    started: dt.datetime | None
+    finished: dt.datetime | None
+    updated: dt.datetime | None
+    progress: int | None = pydantic.Field(None, ge=0, le=100)
+    links: list[Link] | None
 
 
 class ProcessManagerConfig(pydantic.BaseModel):

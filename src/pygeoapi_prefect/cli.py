@@ -50,8 +50,8 @@ def deploy_process(
                         else:
                             print(f"Deploying process {process_id!r} with prefect...")
                             processor.deploy_as_prefect_flow(
-                                queue_name=prefect_queue_name,
                                 deployment_name=deployment_name,
+                                queue_name=prefect_queue_name,
                                 storage_block_name=storage_block_name,
                                 storage_sub_path=storage_sub_path,
                             )

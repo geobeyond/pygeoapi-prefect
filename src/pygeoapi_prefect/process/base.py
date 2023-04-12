@@ -28,9 +28,9 @@ class PrefectDeployment:
 
 async def run_deployment_async(deployment_name: str, parameters: dict, tags: list[str]):
     """Run a deployed pygeoapi process with prefect."""
-    async with get_client() as prefect_client:
-        deployment = await prefect_client.read_deployment_by_name(deployment_name)
-        flow_run = await prefect_client.create_flow_run_from_deployment(
+    async with get_client() as client:
+        deployment = await client.read_deployment_by_name(deployment_name)
+        flow_run = await client.create_flow_run_from_deployment(
             deployment.id,
             parameters=parameters,
             state=Scheduled(),
