@@ -1,7 +1,11 @@
+import abc
 import dataclasses
 import logging
+from pathlib import Path
+from typing import Callable
 
 import anyio
+import pygeoapi.models.processes as schemas
 from prefect import Flow
 from prefect.deployments import (
     Deployment,
@@ -11,11 +15,8 @@ from prefect.blocks.core import Block
 from prefect.client.orchestration import get_client
 from prefect.states import Scheduled
 from pygeoapi.process.base import BaseProcessor
-from pygeoapi.util import JobStatus
 
-from pygeoapi_prefect import schemas
-
-LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -40,17 +41,11 @@ async def run_deployment_async(deployment_name: str, parameters: dict, tags: lis
 
 
 class BasePrefectProcessor(BaseProcessor):
-    process_flow: Flow
-    process_metadata: schemas.Process
     deployment_info: PrefectDeployment | None
 
-    def __init__(self, plugin_definition: dict[str, str]):
-        super().__init__(
-            plugin_definition,
-            self.process_metadata.dict(
-                by_alias=True, exclude_none=True, exclude_unset=True)
-        )
-        if (depl := plugin_definition.get("prefect", {}).get("deployment")) is not None:
+    def __init__(self, processor_def: dict[str, str]):
+        super().__init__(processor_def)
+        if (depl := processor_def.get("prefect", {}).get("deployment")) is not None:
             self.deployment_info = PrefectDeployment(
                 depl["name"],
                 depl["queue"],
@@ -60,12 +55,20 @@ class BasePrefectProcessor(BaseProcessor):
         else:
             self.deployment_info = None
 
+    @property
+    @abc.abstractmethod
+    def process_flow(self) -> Flow:
+        ...
+
     def execute(
             self,
             job_id: str,
-            data_dict: dict,
-            process_async: bool
-    ) -> tuple[str, dict[str, str], JobStatus]:
+            execution_request: schemas.ExecuteRequest,
+            results_storage_root: Path,
+            progress_reporter: Callable[
+                                   [schemas.JobStatusInfoInternal], bool
+                               ] | None = None,
+    ) -> schemas.JobStatusInfoInternal:
         """Execute process.
 
         When implementing processes as prefect flows be sure to also use the
@@ -77,9 +80,9 @@ class BasePrefectProcessor(BaseProcessor):
                     run_deployment_async,
                     f"{self.process_metadata.id}/{self.deployment_info.name}",
                     {**data_dict, "pygeoapi_job_id": job_id},
-                    ["pygeoapi", self.process_metadata.id]
+                    ["pygeoapi", self.process_metadata.id],
                 )
-                result = ("application/json", None, JobStatus.accepted)
+                result = ("application/json", None, schemas.JobStatus.accepted)
             else:
                 flow_run_result = run_deployment(
                     name=f"{self.process_metadata.id}/{self.deployment_info.name}",
@@ -87,26 +90,26 @@ class BasePrefectProcessor(BaseProcessor):
                         "pygeoapi_job_id": job_id,
                         **data_dict,
                     },
-                    tags=["pygeoapi", self.process_metadata.id]
+                    tags=["pygeoapi", self.process_metadata.id],
                 )
-                result = ("application/json", None, JobStatus.successful)
-            LOGGER.warning(f"deployment result: {result}")
+                result = ("application/json", None, schemas.JobStatus.successful)
+            logger.warning(f"deployment result: {result}")
         else:
-            LOGGER.warning(
+            logger.warning(
                 "Cannot run asynchronously on non-deployed processes - ignoring "
                 "`is_async` parameter..."
             )
             flow_run_result = self.process_flow(job_id, **data_dict)
-            result = ("application/json", None, JobStatus.successful)
+            result = ("application/json", None, schemas.JobStatus.successful)
         return result
 
     def deploy_as_prefect_flow(
-            self,
-            *,
-            deployment_name: str | None = None,
-            queue_name: str = "test",
-            storage_block_name: str | None = None,
-            storage_sub_path: str | None = None,
+        self,
+        *,
+        deployment_name: str | None = None,
+        queue_name: str = "test",
+        storage_block_name: str | None = None,
+        storage_sub_path: str | None = None,
     ):
         if storage_block_name is not None:
             storage = Block.load(storage_block_name)

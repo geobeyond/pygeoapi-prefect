@@ -9,13 +9,13 @@ A process manager for [pygeoapi] that uses [prefect].
 
 ## Installation
 
-In time, this project will be available in the python package index (AKA pypi) and be installable via pip, but for 
+In time, this project will be available in the python package index (AKA pypi) and be installable via pip, but for
 now you can install it by git cloning and then using poetry to install
 
 
 ## Enabling the pygeoapi-prefect process manager
 
-The process manager provided by this project can be enabled by tweaking the pygeoapi configuration file. Use the 
+The process manager provided by this project can be enabled by tweaking the pygeoapi configuration file. Use the
 `server.manager` property to specify that pygeoapi shall use this instead of its default process manager
 
 ```yaml
@@ -42,7 +42,7 @@ processes:
 Pre-existing pygeoapi processes can simply be run by the `pygeoapi-prefect` pygeoapi process manager without any
 modification. When using this option, processes are always run locally, and it is not possible to use prefect features
 other than its ephemeral API and the UI for monitoring execution of processes. Other prefect features such as
-deployments, storage, blocks 
+deployments, storage, blocks
 
 
 ## Running prefect-powered processes
@@ -55,7 +55,7 @@ This requires:
 - defining a prefect flow
 - defining a prefect deployment
 
-### Defining 
+### Defining
 
 
 ## Development
@@ -106,7 +106,7 @@ poetry run pygeoapi-prefect deploy-as-prefect-flow hi-prefect-world
 - Run a deployed process with prefect
 
 ```shell
-poetry run prefect deployment run --param 
+poetry run prefect deployment run --param
 ```
 
 
@@ -164,7 +164,7 @@ Now go to the prefect dashboard and create a storage block that references this 
     }
   }
   ```
-  
+
 After having created the block in prefect, we can now deploy our pygeoapi process:
 
 ```shell
@@ -175,7 +175,7 @@ PYGEOAPI_CONFIG=example-config.yml poetry run pygeoapi-prefect deploy-process-as
   --storage-block-name=remote-file-system/test-sb1
 ```
 
-This results in prefect creating a deployment named `hi-prefect-world/test`, and since we are specifying a storage 
+This results in prefect creating a deployment named `hi-prefect-world/test`, and since we are specifying a storage
 block, prefect also uploads the flow code onto the storage (which is the minIO bucket created previously).
 
 ```shell
@@ -195,7 +195,7 @@ poetry run prefect deployment run hi-prefect-world/minio \
   --param pygeoapi_job_id=test-id-1
 ```
 
-Then from the prefect dashboard, by selecting the deployment and clicking on _Run -> Custom run..._ (where we can 
+Then from the prefect dashboard, by selecting the deployment and clicking on _Run -> Custom run..._ (where we can
 specify values for the flow parameters, just as we did before in the CLI example)
 
 Finally, we ought to be able to trigger a run of this deployment by leveraging pygeoapi's support for OAPI - Processes:

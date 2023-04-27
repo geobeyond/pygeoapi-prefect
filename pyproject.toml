@@ -20,6 +20,7 @@ pygeoapi = {path = "../../pygeoapi", develop = true}
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.11.0"
 s3fs = "2023.1.0"
+pre-commit = "^3.2.2"
 
 [tool.poetry.scripts]
 pygeoapi-prefect = "pygeoapi_prefect.cli:root"

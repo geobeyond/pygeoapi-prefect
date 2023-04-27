@@ -8,14 +8,6 @@ import pydantic
 from pygeoapi.util import JobStatus
 
 
-class Link(pydantic.BaseModel):
-    media_type: str
-    rel: str
-    title: str
-    href: str
-    href_lang: str
-
-
 class ProcessIOType(enum.Enum):
     ARRAY = "array"
     BOOLEAN = "boolean"
@@ -49,8 +41,12 @@ class ProcessIOFormat(enum.Enum):
     # nor in OAPI - Processes - but it is mentioned in OAPI - Processes spec as an example
     BINARY = "binary"
     GEOJSON_FEATURE_COLLECTION_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection"
-    GEOJSON_FEATURE_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature"
-    GEOJSON_GEOMETRY_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
+    GEOJSON_FEATURE_URI = (
+        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature"
+    )
+    GEOJSON_GEOMETRY_URI = (
+        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
+    )
     OGC_BBOX_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/ogc-bbox"
     GEOJSON_FEATURE_COLLECTION_SHORT_CODE = "geojson-feature-collection"
     GEOJSON_FEATURE_SHORT_CODE = "geojson-feature"
@@ -67,6 +63,19 @@ class ProcessJobControlOption(enum.Enum):
 class ProcessOutputTransmissionMode(enum.Enum):
     VALUE = "value"
     REFERENCE = "reference"
+
+
+class ProcessResponseType(enum.Enum):
+    document = "document"
+    raw = "raw"
+
+
+class Link(pydantic.BaseModel):
+    href: str
+    type_: typing.Optional[str] = pydantic.Field(None, alias="type")
+    rel: typing.Optional[str] = None
+    title: typing.Optional[str] = None
+    href_lang: typing.Optional[str] = pydantic.Field(None, alias="hreflang")
 
 
 class ProcessMetadata(pydantic.BaseModel):
@@ -107,7 +116,8 @@ class ProcessIOSchema(pydantic.BaseModel):
     items: list["ProcessIOSchema"] | None
     properties: typing.Optional["ProcessIOSchema"]
     additional_properties: typing.Union[bool, "ProcessIOSchema"] = pydantic.Field(
-        True, alias="additionalProperties")
+        True, alias="additionalProperties"
+    )
     description: str | None
     format_: ProcessIOFormat | None = pydantic.Field(None, alias="format")
     default: pydantic.Json[dict] | None
@@ -145,9 +155,11 @@ class Process(pydantic.BaseModel):
     version: str
     id: str
     job_control_options: list[ProcessJobControlOption] = pydantic.Field(
-        alias="jobControlOptions")
+        alias="jobControlOptions"
+    )
     output_transmission: list[ProcessOutputTransmissionMode] = pydantic.Field(
-        [ProcessOutputTransmissionMode.VALUE], alias="outputTransmission")
+        [ProcessOutputTransmissionMode.VALUE], alias="outputTransmission"
+    )
     links: list[Link]
 
     inputs: dict[str, ProcessInput]
@@ -166,13 +178,16 @@ class AdditionalParameters(ProcessMetadata):
 
 class ProcessSummary(pydantic.BaseModel):
     """OAPI - Processes. Schema for a ProcessSummary."""
+
     # definition from ProcessSummary
     id: str
     version: str
     job_control_options: list[ProcessJobControlOption] | None = pydantic.Field(
-        None, alias="jobControlOptions")
+        None, alias="jobControlOptions"
+    )
     output_transmission: list[ProcessOutputTransmissionMode] | None = pydantic.Field(
-        None, alias="outputTransmission")
+        None, alias="outputTransmission"
+    )
     links: list[Link] | None = None
 
     # definition from descriptionType
@@ -181,11 +196,13 @@ class ProcessSummary(pydantic.BaseModel):
     keywords: list[str] | None = None
     metadata: list[ProcessMetadata] | None = None
     additional_parameters: AdditionalParameters | None = pydantic.Field(
-        None, alias="additionalParameters")
+        None, alias="additionalParameters"
+    )
 
 
 class JobStatusInfo(pydantic.BaseModel):
     """OAPI - Processes. Schema for a StatusInfo."""
+
     job_id: str = pydantic.Field(..., alias="jobID")
     status: JobStatus
     type: typing.Literal["process"] = "process"
@@ -204,3 +221,95 @@ class ProcessManagerConfig(pydantic.BaseModel):
     name: str
     connection: str
     output_dir: str
+
+
+class ExecutionInputBBox(pydantic.BaseModel):
+    bbox: list[float] = pydantic.Field(..., min_items=4, max_items=4)
+    crs: typing.Optional[str] = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+
+
+class ExecutionInputValueNoObjectArray(pydantic.BaseModel):
+    __root__: typing.List[
+        typing.Union[ExecutionInputBBox, int, str, "ExecutionInputValueNoObjectArray"]
+    ]
+
+
+class ExecutionInputValueNoObject(pydantic.BaseModel):
+    """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
+
+    __root__: typing.Union[
+        ExecutionInputBBox,
+        bool,
+        float,
+        int,
+        ExecutionInputValueNoObjectArray,
+        str,
+    ]
+
+    class Config:
+        smart_union = True
+
+
+class ExecutionFormat(pydantic.BaseModel):
+    """Models the `format.yml` schema defined in OAPIP."""
+
+    media_type: typing.Optional[str] = pydantic.Field(None, alias="mediaType")
+    encoding: typing.Optional[str]
+    schema_: typing.Optional[typing.Union[str, dict]] = pydantic.Field(
+        None, alias="schema"
+    )
+
+
+class ExecutionQualifiedInputValue(pydantic.BaseModel):
+    """Models the `qualifiedInputValue.yml` schema defined in OAPIP."""
+
+    value: typing.Union[ExecutionInputValueNoObject, dict]
+    format_: typing.Optional[ExecutionFormat] = None
+
+
+class ExecutionOutput(pydantic.BaseModel):
+    """Models the `output.yml` schema defined in OAPIP."""
+
+    format_: typing.Optional[ExecutionFormat] = pydantic.Field(None, alias="format")
+    transmission_mode: typing.Optional[ProcessOutputTransmissionMode] = pydantic.Field(
+        ProcessOutputTransmissionMode.VALUE, alias="transmissionMode"
+    )
+
+    class Config:
+        use_enum_values = True
+
+
+class ExecutionSubscriber(pydantic.BaseModel):
+    """Models the `subscriber.yml` schema defined in OAPIP."""
+
+    success_uri: str = pydantic.Field(..., alias="successUri")
+    in_progress_uri: typing.Optional[str] = pydantic.Field(None, alias="inProgressUri")
+    failed_uri: typing.Optional[str] = pydantic.Field(None, alias="failedUri")
+
+
+class Execution(pydantic.BaseModel):
+    """Models the `execute.yml` schema defined in OAPIP."""
+
+    inputs: typing.Optional[
+        typing.Dict[
+            str,
+            typing.Union[
+                ExecutionInputValueNoObject,
+                ExecutionQualifiedInputValue,
+                Link,
+                typing.List[
+                    typing.Union[
+                        ExecutionInputValueNoObject,
+                        ExecutionQualifiedInputValue,
+                        Link,
+                    ]
+                ],
+            ],
+        ]
+    ] = None
+    outputs: typing.Optional[typing.Dict[str, ExecutionOutput]] = None
+    response: typing.Optional[ProcessResponseType] = ProcessResponseType.raw
+    subscriber: typing.Optional[ExecutionSubscriber] = None
+
+    class Config:
+        use_enum_values = True

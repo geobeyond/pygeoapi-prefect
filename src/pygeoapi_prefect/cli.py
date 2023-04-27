@@ -16,8 +16,8 @@ def root():
 @click.argument("process_id")
 @click.option("-c", "--pygeoapi-config", type=Path, envvar="PYGEOAPI_CONFIG")
 def deploy_process(
-        process_id: str,
-        pygeoapi_config: Path,
+    process_id: str,
+    pygeoapi_config: Path,
 ):
     """Create and apply prefect deployment for PROCESS_ID.
 
@@ -28,7 +28,8 @@ def deploy_process(
         process_config = config.get("resources", {})[process_id]
     except KeyError as exc:
         raise click.BadParameter(
-            f"Process {process_id!r} not found in pygeoapi config") from exc
+            f"Process {process_id!r} not found in pygeoapi config"
+        ) from exc
     else:
         if process_config.get("type", "") == "process":
             process_definition = process_config.get("processor", {})
@@ -38,15 +39,17 @@ def deploy_process(
                 match processor:
                     case BasePrefectProcessor():
                         try:
-                            deployment_config = process_definition.get(
-                                "prefect", {})["deployment"]
+                            deployment_config = process_definition.get("prefect", {})[
+                                "deployment"
+                            ]
                             deployment_name = deployment_config["name"]
                             prefect_queue_name = deployment_config.get("queue", "test")
                             storage_block_name = deployment_config.get("storage-block")
                             storage_sub_path = deployment_config.get("storage-path")
                         except KeyError:
                             raise click.Abort(
-                                "Deployment not specified in pygeoapi config file")
+                                "Deployment not specified in pygeoapi config file"
+                            )
                         else:
                             print(f"Deploying process {process_id!r} with prefect...")
                             processor.deploy_as_prefect_flow(
@@ -65,4 +68,5 @@ def deploy_process(
                 raise click.BadParameter("Invalid pygeoapi configuration")
         else:
             raise click.BadParameter(
-                f"{process_id!r} is not a valid pygeoapi 'process'")
+                f"{process_id!r} is not a valid pygeoapi 'process'"
+            )
