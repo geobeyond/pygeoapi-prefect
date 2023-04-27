@@ -61,13 +61,12 @@ class BasePrefectProcessor(BaseProcessor):
         ...
 
     def execute(
-            self,
-            job_id: str,
-            execution_request: schemas.ExecuteRequest,
-            results_storage_root: Path,
-            progress_reporter: Callable[
-                                   [schemas.JobStatusInfoInternal], bool
-                               ] | None = None,
+        self,
+        job_id: str,
+        execution_request: schemas.ExecuteRequest,
+        results_storage_root: Path,
+        progress_reporter: Callable[[schemas.JobStatusInfoInternal], bool]
+        | None = None,
     ) -> schemas.JobStatusInfoInternal:
         """Execute process.
 

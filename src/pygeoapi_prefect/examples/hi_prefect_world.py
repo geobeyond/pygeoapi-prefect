@@ -36,15 +36,15 @@ def hi_prefect_world(
 
 @flow()
 def new_hi(
-        execution_request: schemas.ExecuteRequest,
-        chosen_execution_mode: schemas.ProcessExecutionMode,
-        process_description: schemas.ProcessDescription,
+    execution_request: schemas.ExecuteRequest,
+    chosen_execution_mode: schemas.ProcessExecutionMode,
+    process_description: schemas.ProcessDescription,
 ) -> schemas.JobStatusInfoInternal:
     """Echo back a greeting message."""
     flow_run_ctx = FlowRunContext.get()
     name = execution_request.inputs["name"].__root__
     msg = (
-        m.__root__ if (m := execution_request.inputs.get("message")) is not None else ''
+        m.__root__ if (m := execution_request.inputs.get("message")) is not None else ""
     )
     result_echo = f"Hi from prefect {name}. {msg}".strip()
     # what to return?
@@ -73,9 +73,10 @@ def new_hi(
             "result": schemas.OutputExecutionResultInternal(
                 location="",
                 media_type=(
-                    process_description.outputs["result"].schema_.content_media_type)
+                    process_description.outputs["result"].schema_.content_media_type
+                ),
             )
-        }
+        },
     )
     return status_info
 
@@ -85,7 +86,7 @@ def another_hi(execution_request: schemas.ExecuteRequest) -> dict[str, str]:
     """Echo back a greeting message."""
     logger.debug(f"Inside the flow - locals: {locals()}")
     name = execution_request.inputs["name"].__root__
-    msg = m.__root__ if (m := execution_request.inputs["message"]) is not None else ''
+    msg = m.__root__ if (m := execution_request.inputs["message"]) is not None else ""
     return {"echo": f"Hi from prefect {name}. {msg}".strip()}
 
 
