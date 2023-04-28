@@ -18,9 +18,9 @@ server:
     url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
     attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
   manager:
-    # name: pygeoapi_prefect.manager.PrefectManager
-    name: TinyDB
-    connection: /tmp/pygeoapi-process-manager.db
+    name: pygeoapi_prefect.manager.PrefectManager
+    # name: TinyDB
+    # connection: /tmp/pygeoapi-process-manager.db
     output_dir: /tmp/
   # ogc_schemas_location: /opt/schemas.opengis.net
 
@@ -83,6 +83,6 @@ resources:
         result-storage: remote-file-system/test-sb1/results
         deployment:
           name: minio
-          queue: test
-          storage-block: remote-file-system/test-sb1
-          storage-path: hi-prefect-world-flow
+          queue: pygeoapi
+          storage_block: remote-file-system/test-sb1
+          storage_sub_path: hi-prefect-world-flow

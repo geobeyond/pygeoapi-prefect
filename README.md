@@ -149,8 +149,19 @@ docker run \
 
 Login to the minIO dashboard at http://127.0.0.1:9090 then go ahead and create a bucket named `pygeoapi-test`
 
-Now go to the prefect dashboard and create a storage block that references this bucket. You may create a block of type
-*Remote File System*:
+Now you need to create a storage block that references this bucket. Either use the custom pygeoapi-prefect CLI command
+or create the block using Prefect dashboard. With the CLI command:
+
+```shell
+poetry run pygeoapi-prefect create-storage-block \
+    test-sb1 \
+    s3://pygeoapi-test \
+    http://localhost:9000 \
+    tester \
+    12345678
+```
+
+Using the Prefect CLI You may create a block of type *Remote File System*:
 
 - name: `test-sb1`
 - basepath: `s3://pygeoapi-test`
@@ -168,11 +179,7 @@ Now go to the prefect dashboard and create a storage block that references this 
 After having created the block in prefect, we can now deploy our pygeoapi process:
 
 ```shell
-PYGEOAPI_CONFIG=example-config.yml poetry run pygeoapi-prefect deploy-process-as-flow \
-  hi-prefect-world \
-  --prefect-queue-name=test \
-  --deployment-name=test \
-  --storage-block-name=remote-file-system/test-sb1
+PYGEOAPI_CONFIG=example-config.yml poetry run pygeoapi-prefect deploy-process-as-flow hi-prefect-world
 ```
 
 This results in prefect creating a deployment named `hi-prefect-world/test`, and since we are specifying a storage

@@ -12,6 +12,8 @@ This module contains:
 import logging
 
 import pygeoapi.models.processes as schemas
+from pygeoapi.process.base import BaseProcessor
+from pygeoapi.process import exceptions
 from prefect import flow
 from prefect.context import FlowRunContext
 
@@ -21,17 +23,20 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 
 logger = logging.getLogger(__name__)
 
-RESULT_OUTPUT_MEDIA_TYPE = "application/json"
 
-
-@flow(flow_run_name="pygeoapi-job-{pygeoapi_job_id}")
-def hi_prefect_world(
-    pygeoapi_job_id: str, name: str, message: str | None = None
-) -> tuple[str, dict[str, str]]:
+@flow()
+def hi_prefect_world(job_id: str, execution_request: schemas.ExecuteRequest) -> str:
     """Echo back a greeting message."""
     logger.warning(f"Inside the hi_prefect_world flow - locals: {locals()}")
-    result = f"Hi from prefect {name}{f' - {message}' if message is not None else ''}"
-    return RESULT_OUTPUT_MEDIA_TYPE, {"result": result}
+    try:
+        name = execution_request.inputs["name"].__root__
+    except KeyError:
+        raise exceptions.MissingJobParameterError("Cannot process without a name")
+    else:
+        msg = execution_request.inputs.get("message")
+        message = msg.__root__ if msg is not None else ""
+        echo_value = f"Hello {name}! {message}".strip()
+    return echo_value
 
 
 @flow()
@@ -96,39 +101,38 @@ class HiPrefectWorldProcessor(BasePrefectProcessor):
     process_description = schemas.ProcessDescription(
         id="hi-prefect-world",  # id MUST match key given in pygeoapi config
         version="0.0.1",
-        title={"en": "Hi prefect world Processor"},
-        description={"en": "An example processor that is created with pydantic"},
+        title="Hi prefect world Processor",
+        description="An example processor that is created with pydantic",
         jobControlOptions=[
             schemas.ProcessJobControlOption.SYNC_EXECUTE,
             schemas.ProcessJobControlOption.ASYNC_EXECUTE,
         ],
-        outputTransmission=[schemas.ProcessOutputTransmissionMode.VALUE],
         inputs={
             "name": schemas.ProcessInput(
-                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING),
-                minOccurs=1,
-                maxOccurs=1,
                 title="Name",
                 description="Some name you think is cool. It will be echoed back.",
+                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING),
                 keywords=["cool-name"],
             ),
             "message": schemas.ProcessInput(
-                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING),
                 title="Message",
                 description="An optional additional message to be echoed to the world",
+                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING),
                 minOccurs=0,
-                maxOccurs=1,
             ),
         },
         outputs={
             "result": schemas.ProcessOutput(
                 schema=schemas.ProcessIOSchema(
-                    type=schemas.ProcessIOType.OBJECT,
-                    contentMediaType=RESULT_OUTPUT_MEDIA_TYPE,
+                    type=schemas.ProcessIOType.STRING,
+                    contentMediaType="text/plain",
                 )
             )
         },
-        links=[],
-        keywords=["process", "hi-world", "example"],
-        example={"inputs": {"message": "wazzaaaap!"}},
+        keywords=[
+            "process",
+            "prefect",
+            "example",
+        ],
+        example={"inputs": {"name": "spiderboy"}},
     )

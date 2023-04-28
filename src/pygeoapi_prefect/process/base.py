@@ -4,14 +4,8 @@ import logging
 from pathlib import Path
 from typing import Callable
 
-import anyio
 import pygeoapi.models.processes as schemas
 from prefect import Flow
-from prefect.deployments import (
-    Deployment,
-    run_deployment,
-)
-from prefect.blocks.core import Block
 from prefect.client.orchestration import get_client
 from prefect.states import Scheduled
 from pygeoapi.process.base import BaseProcessor
@@ -27,17 +21,19 @@ class PrefectDeployment:
     storage_sub_path: str | None = None
 
 
-async def run_deployment_async(deployment_name: str, parameters: dict, tags: list[str]):
-    """Run a deployed pygeoapi process with prefect."""
-    async with get_client() as client:
-        deployment = await client.read_deployment_by_name(deployment_name)
-        flow_run = await client.create_flow_run_from_deployment(
-            deployment.id,
-            parameters=parameters,
-            state=Scheduled(),
-            tags=tags,
-        )
-        return flow_run
+#
+#
+# async def run_deployment_async(deployment_name: str, parameters: dict, tags: list[str]):
+#     """Run a deployed pygeoapi process with prefect."""
+#     async with get_client() as client:
+#         deployment = await client.read_deployment_by_name(deployment_name)
+#         flow_run = await client.create_flow_run_from_deployment(
+#             deployment.id,
+#             parameters=parameters,
+#             state=Scheduled(),
+#             tags=tags,
+#         )
+#         return flow_run
 
 
 class BasePrefectProcessor(BaseProcessor):
@@ -73,54 +69,35 @@ class BasePrefectProcessor(BaseProcessor):
         When implementing processes as prefect flows be sure to also use the
         pygeoapi-prefect process manager.
         """
-        if self.deployment_info is not None:
-            if process_async:
-                flow_run_result = anyio.run(
-                    run_deployment_async,
-                    f"{self.process_metadata.id}/{self.deployment_info.name}",
-                    {**data_dict, "pygeoapi_job_id": job_id},
-                    ["pygeoapi", self.process_metadata.id],
-                )
-                result = ("application/json", None, schemas.JobStatus.accepted)
-            else:
-                flow_run_result = run_deployment(
-                    name=f"{self.process_metadata.id}/{self.deployment_info.name}",
-                    parameters={
-                        "pygeoapi_job_id": job_id,
-                        **data_dict,
-                    },
-                    tags=["pygeoapi", self.process_metadata.id],
-                )
-                result = ("application/json", None, schemas.JobStatus.successful)
-            logger.warning(f"deployment result: {result}")
-        else:
-            logger.warning(
-                "Cannot run asynchronously on non-deployed processes - ignoring "
-                "`is_async` parameter..."
-            )
-            flow_run_result = self.process_flow(job_id, **data_dict)
-            result = ("application/json", None, schemas.JobStatus.successful)
-        return result
-
-    def deploy_as_prefect_flow(
-        self,
-        *,
-        deployment_name: str | None = None,
-        queue_name: str = "test",
-        storage_block_name: str | None = None,
-        storage_sub_path: str | None = None,
-    ):
-        if storage_block_name is not None:
-            storage = Block.load(storage_block_name)
-        else:
-            storage = None
-
-        deployment = Deployment.build_from_flow(
-            self.process_flow,
-            name=deployment_name or self.name,
-            work_queue_name=queue_name,
-            storage=storage,
-            path=storage_sub_path,
-            ignore_file=None,
+        raise RuntimeError(
+            "This processor is supposed to be run with the pygeoapi prefect "
+            "manager, which will never call process.execute()"
         )
-        deployment.apply()
+        # if self.deployment_info is not None:
+        #     if process_async:
+        #         flow_run_result = anyio.run(
+        #             run_deployment_async,
+        #             f"{self.process_metadata.id}/{self.deployment_info.name}",
+        #             {**data_dict, "pygeoapi_job_id": job_id},
+        #             ["pygeoapi", self.process_metadata.id],
+        #         )
+        #         result = ("application/json", None, schemas.JobStatus.accepted)
+        #     else:
+        #         flow_run_result = run_deployment(
+        #             name=f"{self.process_metadata.id}/{self.deployment_info.name}",
+        #             parameters={
+        #                 "pygeoapi_job_id": job_id,
+        #                 **data_dict,
+        #             },
+        #             tags=["pygeoapi", self.process_metadata.id],
+        #         )
+        #         result = ("application/json", None, schemas.JobStatus.successful)
+        #     logger.warning(f"deployment result: {result}")
+        # else:
+        #     logger.warning(
+        #         "Cannot run asynchronously on non-deployed processes - ignoring "
+        #         "`is_async` parameter..."
+        #     )
+        #     flow_run_result = self.process_flow(job_id, **data_dict)
+        #     result = ("application/json", None, schemas.JobStatus.successful)
+        # return result
