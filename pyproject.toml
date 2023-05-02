@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "pygeoapi-prefect"
+version = "0.1.0"
+description = ""
+authors = ["Geobeyond <info@geobeyond.it>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "pygeoapi_prefect", from = "src"}
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic = "^1.10.7"
+prefect = "^2.9.0"
+click = "8.0.0"  # this version is fixed in order to be compatible with upstream pygeoapi
+pygeoapi = {path = "../../pygeoapi", develop = true}
+
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.11.0"
+s3fs = "2023.1.0"
+pre-commit = "^3.2.2"
+
+[tool.poetry.scripts]
+pygeoapi-prefect = "pygeoapi_prefect.cli:root"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
