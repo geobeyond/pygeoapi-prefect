@@ -14,6 +14,7 @@ from prefect import flow
 from prefect.client.orchestration import get_client
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
+from prefect.exceptions import MissingResult
 from prefect.server.schemas import filters
 from prefect.server.schemas.core import Flow
 from prefect.server.schemas.states import StateType
@@ -161,13 +162,23 @@ class PrefectManager(BaseManager):
         - If there is no deployment for the process, then run locally and
           synchronously
         """
-        if processor.deployment_info is None:  # will run sync
+        run_params = {
+            "job_id": job_id,
+            "result_storage_block": processor.result_storage_block,
+            "process_description": processor.process_description.dict(
+                by_alias=True, exclude_none=True
+            ),
+            "execution_request": execution_request.dict(
+                by_alias=True, exclude_none=True
+            ),
+        }
+        if processor.deployment_info is None:  # will run locally and sync
             if chosen_mode == ProcessExecutionMode.sync_execute:
                 print(f"synchronous execution without deployment")
                 logger.debug(f"synchronous execution")
-                flow_run_result = processor.process_flow(
-                    execution_request.dict(by_alias=True)
-                )
+                flow_fn = processor.process_flow
+                flow_fn.flow_run_name = self._job_id_to_flow_run_name(job_id)
+                partial_status_info = processor.process_flow(**run_params)
             else:
                 raise NotImplementedError("Cannot run regular processes async")
         else:
@@ -176,21 +187,18 @@ class PrefectManager(BaseManager):
             )
             run_kwargs = {
                 "name": deployment_name,
-                "parameters": {
-                    "job_id": job_id,
-                    "execution_request": execution_request,
-                },
+                "parameters": run_params,
                 "flow_run_name": self._job_id_to_flow_run_name(job_id),
             }
             if chosen_mode == ProcessExecutionMode.sync_execute:
                 print(f"synchronous execution with deployment")
                 print(f"run_kwargs: {run_kwargs}")
                 logger.debug(f"synchronous execution")
-                flow_run_result = run_deployment(**run_kwargs)
+                run_deployment(**run_kwargs)
             else:
                 print(f"asynchronous execution")
                 logger.debug(f"asynchronous execution")
-                flow_run_result = run_deployment(
+                run_deployment(
                     **run_kwargs, timeout=0  # has the effect of returning immediately
                 )
                 # flow_run_result = anyio.run(
@@ -199,8 +207,9 @@ class PrefectManager(BaseManager):
                 #     job_id,
                 #     execution_request.dict(by_alias=True),
                 # )
-        print(f"flow_run_result: {flow_run_result}")
-        return self.get_job(flow_run_result.flow_id)
+        updated_status_info = self.get_job(job_id)
+        print(f"updated_status_info: {updated_status_info}")
+        return updated_status_info
 
     def _execute_base_processor(
         self,
@@ -295,6 +304,11 @@ class PrefectManager(BaseManager):
         self, flow_run: FlowRun, prefect_flow: Flow
     ) -> JobStatusInfoInternal:
         job_id = self._flow_run_name_to_job_id(flow_run.name)
+        try:
+            partial_info = flow_run.state.result()
+            generated_outputs = partial_info.generated_outputs
+        except MissingResult:
+            generated_outputs = None
         return JobStatusInfoInternal(
             jobID=job_id,
             status=self.prefect_state_map[flow_run.state_type],
@@ -302,6 +316,7 @@ class PrefectManager(BaseManager):
             created=flow_run.created,
             started=flow_run.start_time,
             finished=flow_run.end_time,
+            generated_outputs=generated_outputs,
         )
 
 

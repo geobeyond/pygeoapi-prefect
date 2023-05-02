@@ -6,8 +6,6 @@ from typing import Callable
 
 import pygeoapi.models.processes as schemas
 from prefect import Flow
-from prefect.client.orchestration import get_client
-from prefect.states import Scheduled
 from pygeoapi.process.base import BaseProcessor
 
 logger = logging.getLogger(__name__)
@@ -38,6 +36,7 @@ class PrefectDeployment:
 
 class BasePrefectProcessor(BaseProcessor):
     deployment_info: PrefectDeployment | None
+    result_storage_block: str | None
 
     def __init__(self, processor_def: dict[str, str]):
         super().__init__(processor_def)
@@ -50,6 +49,8 @@ class BasePrefectProcessor(BaseProcessor):
             )
         else:
             self.deployment_info = None
+        if (sb := processor_def.get("prefect", {}).get("result_storage")) is not None:
+            self.result_storage_block = sb
 
     @property
     @abc.abstractmethod

@@ -12,10 +12,13 @@ This module contains:
 import logging
 
 import pygeoapi.models.processes as schemas
-from pygeoapi.process.base import BaseProcessor
-from pygeoapi.process import exceptions
 from prefect import flow
+from prefect.filesystems import (
+    LocalFileSystem,
+    RemoteFileSystem,
+)
 from prefect.context import FlowRunContext
+from pygeoapi.process import exceptions
 
 # don't perform relative imports because otherwise prefect deployment won't
 # work properly
@@ -24,9 +27,22 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 logger = logging.getLogger(__name__)
 
 
-@flow()
-def hi_prefect_world(job_id: str, execution_request: schemas.ExecuteRequest) -> str:
-    """Echo back a greeting message."""
+@flow(persist_result=True)
+def hi_prefect_world(
+    job_id: str,
+    result_storage_block: str | None,
+    process_description: schemas.ProcessDescription,
+    execution_request: schemas.ExecuteRequest,
+) -> schemas.JobStatusInfoInternal:
+    """Echo back a greeting message.
+
+    Execution follows this pattern:
+
+    - get inputs from the provided execution request
+    - generate result
+    - persist result
+    - return JobStatusInfoInternal
+    """
     logger.warning(f"Inside the hi_prefect_world flow - locals: {locals()}")
     try:
         name = execution_request.inputs["name"].__root__
@@ -34,9 +50,37 @@ def hi_prefect_world(job_id: str, execution_request: schemas.ExecuteRequest) -> 
         raise exceptions.MissingJobParameterError("Cannot process without a name")
     else:
         msg = execution_request.inputs.get("message")
+        if result_storage_block is not None:
+            storage_block_type, storage_base_path = result_storage_block.partition("/")[
+                ::2
+            ]
+            if storage_block_type == "remote-file-system":
+                file_system = RemoteFileSystem.load(storage_base_path)
+            else:
+                raise RuntimeError(
+                    f"File systems of type {storage_block_type!r} are not supported "
+                    f"by this process"
+                )
+        else:
+            file_system = LocalFileSystem()
+        print(f"file_system: {file_system}")
         message = msg.__root__ if msg is not None else ""
-        echo_value = f"Hello {name}! {message}".strip()
-    return echo_value
+        result_value = f"Hello {name}! {message}".strip()
+        result_path = f"{job_id}/output-result.txt"
+        file_system.write_path(result_path, result_value.encode("utf-8"))
+    return schemas.JobStatusInfoInternal(
+        jobID=job_id,
+        processID=process_description.id,
+        status=schemas.JobStatus.successful,
+        generated_outputs={
+            "result": schemas.OutputExecutionResultInternal(
+                location=f"{file_system.basepath}/{result_path}",
+                media_type=(
+                    process_description.outputs["result"].schema_.content_media_type
+                ),
+            )
+        },
+    )
 
 
 @flow()
@@ -84,15 +128,6 @@ def new_hi(
         },
     )
     return status_info
-
-
-@flow()
-def another_hi(execution_request: schemas.ExecuteRequest) -> dict[str, str]:
-    """Echo back a greeting message."""
-    logger.debug(f"Inside the flow - locals: {locals()}")
-    name = execution_request.inputs["name"].__root__
-    msg = m.__root__ if (m := execution_request.inputs["message"]) is not None else ""
-    return {"echo": f"Hi from prefect {name}. {msg}".strip()}
 
 
 class HiPrefectWorldProcessor(BasePrefectProcessor):

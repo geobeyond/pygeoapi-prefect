@@ -11,7 +11,7 @@ from pygeoapi.process import exceptions
 from .process.base import BasePrefectProcessor
 
 
-@click.group()
+@click.group(name="prefect")
 def root():
     ...
 

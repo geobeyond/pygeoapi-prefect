@@ -80,7 +80,7 @@ resources:
     processor:
       name: pygeoapi_prefect.examples.hi_prefect_world.HiPrefectWorldProcessor
       prefect:
-        result-storage: remote-file-system/test-sb1/results
+        result_storage: remote-file-system/test-sb1-results
         deployment:
           name: minio
           queue: pygeoapi

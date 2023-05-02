@@ -55,7 +55,30 @@ This requires:
 - defining a prefect flow
 - defining a prefect deployment
 
-### Defining
+### Defining prefect-powered processes
+
+Prefect-powered processes need to inherit from `pygeoapi_prefect.process.base.BasePrefectProcessor`, which itself
+derives from pygeoapi's `BaseProcessor`.
+
+They have two additional properties, which can be specified for each process in the pygeoapi config file:
+
+- `deployment_info`
+- `result_storage_block`
+
+
+#### Storing process execution results
+
+As we have seen pygeoapi processes are just a think layer on top of regular prefect flows. However, because pygeoapi
+expects to be able to retrieve job execution results, there are some special requirements that your custom flows must
+conform to. This means that, in order to be able to find flow run execution results:
+
+- the flow must persist its outputs using prefect storage blocks
+- the flow must return a `pygeoapi.models.processes.JobStatusInfoInternal`, specifying where the generated outputs have
+  been stored
+- the flow must be run with `persist_results=True` in order to have prefect store the `JobStatusInfoInternal`, which
+  is what we later use to figure out where our actual (file-based) results are and retrieve them
+
+
 
 
 ## Development
