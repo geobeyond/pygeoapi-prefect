@@ -1,0 +1,27 @@
+site_name: pygeoapi-prefect
+repo_url: https://github.com/geobeyond/pygeoapi-prefect
+repo_name: pygeoapi-prefect
+site_description: pygeoapi process manager pwered by prefect
+site_author: geobeyond
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+  - User Guide: user-guide.md
+  - Development: development.md
+
+theme:
+  name: material
+  palette:
+    primary: orange
+    accent: light blue
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - content.action.edit
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
