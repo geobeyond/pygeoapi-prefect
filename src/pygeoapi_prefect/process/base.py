@@ -19,26 +19,11 @@ class PrefectDeployment:
     storage_sub_path: str | None = None
 
 
-#
-#
-# async def run_deployment_async(deployment_name: str, parameters: dict, tags: list[str]):
-#     """Run a deployed pygeoapi process with prefect."""
-#     async with get_client() as client:
-#         deployment = await client.read_deployment_by_name(deployment_name)
-#         flow_run = await client.create_flow_run_from_deployment(
-#             deployment.id,
-#             parameters=parameters,
-#             state=Scheduled(),
-#             tags=tags,
-#         )
-#         return flow_run
-
-
 class BasePrefectProcessor(BaseProcessor):
     deployment_info: PrefectDeployment | None
     result_storage_block: str | None
 
-    def __init__(self, processor_def: dict[str, str]):
+    def __init__(self, processor_def: dict):
         super().__init__(processor_def)
         if (depl := processor_def.get("prefect", {}).get("deployment")) is not None:
             self.deployment_info = PrefectDeployment(

@@ -9,25 +9,21 @@ This module contains:
 - The `HiPrefectWorldProcessor`, which is a pygeoapi process definition that can be used
   in conjunction with the prefect process manager
 """
-import logging
-
 import pygeoapi.models.processes as schemas
-from prefect import flow
-from prefect.filesystems import (
-    LocalFileSystem,
-    RemoteFileSystem,
+from prefect import (
+    flow,
+    get_run_logger,
 )
-from prefect.context import FlowRunContext
+from prefect.filesystems import LocalFileSystem
 from pygeoapi.process import exceptions
 
 # don't perform relative imports because otherwise prefect deployment won't
 # work properly
 from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.util import get_storage_file_system
 
-logger = logging.getLogger(__name__)
 
-
-@flow(persist_result=True)
+@flow(persist_result=True, log_prints=True)
 def hi_prefect_world(
     job_id: str,
     result_storage_block: str | None,
@@ -43,6 +39,7 @@ def hi_prefect_world(
     - persist result
     - return JobStatusInfoInternal
     """
+    logger = get_run_logger()
     logger.warning(f"Inside the hi_prefect_world flow - locals: {locals()}")
     try:
         name = execution_request.inputs["name"].__root__
@@ -51,16 +48,7 @@ def hi_prefect_world(
     else:
         msg = execution_request.inputs.get("message")
         if result_storage_block is not None:
-            storage_block_type, storage_base_path = result_storage_block.partition("/")[
-                ::2
-            ]
-            if storage_block_type == "remote-file-system":
-                file_system = RemoteFileSystem.load(storage_base_path)
-            else:
-                raise RuntimeError(
-                    f"File systems of type {storage_block_type!r} are not supported "
-                    f"by this process"
-                )
+            file_system = get_storage_file_system(result_storage_block)
         else:
             file_system = LocalFileSystem()
         print(f"file_system: {file_system}")
@@ -81,53 +69,6 @@ def hi_prefect_world(
             )
         },
     )
-
-
-@flow()
-def new_hi(
-    execution_request: schemas.ExecuteRequest,
-    chosen_execution_mode: schemas.ProcessExecutionMode,
-    process_description: schemas.ProcessDescription,
-) -> schemas.JobStatusInfoInternal:
-    """Echo back a greeting message."""
-    flow_run_ctx = FlowRunContext.get()
-    name = execution_request.inputs["name"].__root__
-    msg = (
-        m.__root__ if (m := execution_request.inputs.get("message")) is not None else ""
-    )
-    result_echo = f"Hi from prefect {name}. {msg}".strip()
-    # what to return?
-    # - could return JobStatusInfoInternal, but then we'd need to store
-    #   results inside the flow and ignore prefect's results and storage,
-    #   which seems silly.
-    # - Could return just the result and let prefect store the result by setting
-    #   persist_results in the flow. This means result can be stored in some
-    #   remote storage block too. How would pygeoapi handle that? I guess the
-    #   job manager could deal with generating the status_info and could also
-    # deal with the fetching of results
-    status_info = schemas.JobStatusInfoInternal(
-        jobID=str(flow_run_ctx.flow_run.id),
-        processID=process_description.id,
-        status=schemas.JobStatus.successful,
-        message="process completed successfully",
-        created=flow_run_ctx.start_time,
-        started=flow_run_ctx.flow_run.start_time,
-        finished=flow_run_ctx.flow_run.end_time,
-        updated=flow_run_ctx.flow_run.end_time,
-        progress=100,
-        negotiated_execution_mode=chosen_execution_mode,
-        requested_response_type=execution_request.response,
-        requested_outputs=execution_request.outputs,
-        generated_outputs={
-            "result": schemas.OutputExecutionResultInternal(
-                location="",
-                media_type=(
-                    process_description.outputs["result"].schema_.content_media_type
-                ),
-            )
-        },
-    )
-    return status_info
 
 
 class HiPrefectWorldProcessor(BasePrefectProcessor):

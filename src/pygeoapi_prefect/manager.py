@@ -3,11 +3,6 @@
 import logging
 import uuid
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Optional,
-)
 
 import anyio
 from prefect import flow
@@ -18,16 +13,13 @@ from prefect.exceptions import MissingResult
 from prefect.server.schemas import filters
 from prefect.server.schemas.core import Flow
 from prefect.server.schemas.states import StateType
-from prefect.states import Scheduled
-from prefect.task_runners import (
-    BaseTaskRunner,
-    ConcurrentTaskRunner,
-)
+from prefect.task_runners import ConcurrentTaskRunner
 from pygeoapi.models.processes import (
     ExecuteRequest,
     JobStatus,
     JobStatusInfoInternal,
     ProcessExecutionMode,
+    OutputExecutionResultInternal,
     RequestedProcessExecutionMode,
 )
 from pygeoapi.process import exceptions
@@ -35,6 +27,7 @@ from pygeoapi.process.base import BaseProcessor
 from pygeoapi.process.manager.base import BaseManager
 
 from .process.base import BasePrefectProcessor
+from .util import get_storage_file_system
 
 logger = logging.getLogger(__name__)
 
@@ -173,15 +166,22 @@ class PrefectManager(BaseManager):
             ),
         }
         if processor.deployment_info is None:  # will run locally and sync
+            flow_fn = processor.process_flow
+            flow_fn.flow_run_name = self._job_id_to_flow_run_name(job_id)
+            flow_fn.persist_result = True
+            flow_fn.log_prints = True
             if chosen_mode == ProcessExecutionMode.sync_execute:
-                print(f"synchronous execution without deployment")
-                logger.debug(f"synchronous execution")
-                flow_fn = processor.process_flow
-                flow_fn.flow_run_name = self._job_id_to_flow_run_name(job_id)
-                partial_status_info = processor.process_flow(**run_params)
+                logger.info("synchronous execution without deployment")
+                processor.process_flow(**run_params)
             else:
                 raise NotImplementedError("Cannot run regular processes async")
         else:
+            # if there is a deployment, then we must rely on the flow function
+            # having been explicitly configured to:
+            # - persist results
+            # - log prints
+            #
+            # deployed flows cannot be modified in the same way as local ones
             deployment_name = (
                 f"{processor.process_description.id}/{processor.deployment_info.name}"
             )
@@ -191,24 +191,15 @@ class PrefectManager(BaseManager):
                 "flow_run_name": self._job_id_to_flow_run_name(job_id),
             }
             if chosen_mode == ProcessExecutionMode.sync_execute:
-                print(f"synchronous execution with deployment")
-                print(f"run_kwargs: {run_kwargs}")
-                logger.debug(f"synchronous execution")
+                logger.info("synchronous execution with deployment")
                 run_deployment(**run_kwargs)
             else:
-                print(f"asynchronous execution")
-                logger.debug(f"asynchronous execution")
+                logger.info("asynchronous execution")
                 run_deployment(
                     **run_kwargs, timeout=0  # has the effect of returning immediately
                 )
-                # flow_run_result = anyio.run(
-                #     run_deployment_async,
-                #     deployment_name,
-                #     job_id,
-                #     execution_request.dict(by_alias=True),
-                # )
         updated_status_info = self.get_job(job_id)
-        print(f"updated_status_info: {updated_status_info}")
+        logger.info(f"updated_status_info: {updated_status_info}")
         return updated_status_info
 
     def _execute_base_processor(
@@ -223,6 +214,8 @@ class PrefectManager(BaseManager):
             name=processor.process_description.id,
             version=processor.process_description.version,
             flow_run_name=self._job_id_to_flow_run_name(job_id),
+            persist_result=True,
+            log_prints=True,
             validate_parameters=True,
             task_runner=ConcurrentTaskRunner(),  # this should be configurable
             retries=0,  # this should be configurable
@@ -243,8 +236,6 @@ class PrefectManager(BaseManager):
                 # progress_reporter=progress_reporter
             )
 
-        # return executor(
-        #     job_id, execution_request, self.output_dir, self.update_job)
         return executor(job_id, execution_request, self.output_dir)
 
     def execute_process(
@@ -266,6 +257,8 @@ class PrefectManager(BaseManager):
         """
         processor = self.get_processor(process_id)
         print(f"processor: {processor}")
+        logger.info(f"info processor: {processor}")
+        logger.warning(f"warning processor: {processor}")
         chosen_mode, additional_headers = self._select_execution_mode(
             requested_execution_mode, processor
         )
@@ -300,6 +293,27 @@ class PrefectManager(BaseManager):
         """
         raise NotImplementedError
 
+    def get_output_data_raw(
+        self, generated_output: OutputExecutionResultInternal, process_id: str
+    ) -> bytes:
+        """Get output data as bytes."""
+        processor = self.get_processor(process_id)
+        if isinstance(processor, BasePrefectProcessor):
+            if (sb := processor.result_storage_block) is not None:
+                file_system = get_storage_file_system(sb)
+                result = file_system.read_path(generated_output.location)
+            else:
+                result = super().get_output_data_raw(generated_output, process_id)
+        else:
+            result = super().get_output_data_raw(generated_output, process_id)
+        return result
+
+    def get_output_data_link_href(
+        self, generated_output: OutputExecutionResultInternal, process_id: str
+    ) -> str:
+        # we need to convert internal location into a proper href for a link
+        return super().get_output_data_link_href(generated_output, process_id)
+
     def _flow_run_to_job_status(
         self, flow_run: FlowRun, prefect_flow: Flow
     ) -> JobStatusInfoInternal:
@@ -307,7 +321,8 @@ class PrefectManager(BaseManager):
         try:
             partial_info = flow_run.state.result()
             generated_outputs = partial_info.generated_outputs
-        except MissingResult:
+        except MissingResult as err:
+            logger.warning(f"Could not get flow_run results: {err}")
             generated_outputs = None
         return JobStatusInfoInternal(
             jobID=job_id,
@@ -318,22 +333,6 @@ class PrefectManager(BaseManager):
             finished=flow_run.end_time,
             generated_outputs=generated_outputs,
         )
-
-
-async def run_deployment_async(deployment_name: str, parameters: dict):
-    """Run a deployed pygeoapi process with prefect asynchronously.
-
-    :param deployment_name: The name of the deployment to run - this is a string
-    of the form `flow_name/deployment_name`
-    """
-    async with get_client() as client:
-        deployment = await client.read_deployment_by_name(deployment_name)
-        flow_run = await client.create_flow_run_from_deployment(
-            deployment.id,
-            parameters=parameters,
-            state=Scheduled(),
-        )
-        return flow_run
 
 
 async def _get_prefect_flow_runs(
@@ -357,13 +356,6 @@ async def _get_prefect_flow_runs(
             )
         )
     return response
-
-
-# async def _get_prefect_flow_run(flow_run_id: uuid.UUID) -> tuple[FlowRun, Flow]:
-#     async with get_client() as client:
-#         flow_run = await client.read_flow_run(flow_run_id)
-#         prefect_flow = await client.read_flow(flow_run.flow_id)
-#         return flow_run, prefect_flow
 
 
 async def _get_prefect_flow_run(flow_run_name: str) -> tuple[FlowRun, Flow] | None:
