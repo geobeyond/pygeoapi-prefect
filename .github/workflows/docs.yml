@@ -1,0 +1,50 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+      -
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  ci:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install poetry
+        run: pipx install poetry==1.3.1
+
+      - name: setup Python cache
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: poetry
+
+      - name: Install requirements
+        run: poetry install --only docs
+
+      - name: (Re)build docs
+        run: poetry run mkdocs build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1.0.8
+        with:
+          path: "site/"
+
+  publish-docs:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-22.04
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to github pages
+        id: deployment
+        uses: actions/deploy-pages@v2
