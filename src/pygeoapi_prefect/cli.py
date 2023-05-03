@@ -1,12 +1,12 @@
 from pathlib import Path
 
 import click
-import yaml
 from prefect.blocks.core import Block
 from prefect.deployments import Deployment
 from prefect.filesystems import RemoteFileSystem
 from pygeoapi.process.manager import get_manager
 from pygeoapi.process import exceptions
+from pygeoapi.util import yaml_load
 
 from .process.base import BasePrefectProcessor
 
@@ -70,7 +70,7 @@ def deploy_process(
     file.
     """
     with pygeoapi_config.open() as fh:
-        config = yaml.safe_load(fh)
+        config = yaml_load(fh)
     manager = get_manager(config)
     try:
         processor = manager.get_processor(process_id)
