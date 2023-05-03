@@ -46,7 +46,7 @@ jobs:
         run: poetry run mkdocs build
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact
+        uses: actions/upload-pages-artifact@v1.0.8
         with:
           path: "site/"
 
