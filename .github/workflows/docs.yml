@@ -38,8 +38,11 @@ jobs:
       - name: Install requirements
         run: pip install mkdocs mkdocs-material
 
+#      - name: (Re)build docs
+#        run: poetry run mkdocs build
+
       - name: (Re)build docs
-        run: poetry run mkdocs build
+        run: mkdocs build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1.0.8
