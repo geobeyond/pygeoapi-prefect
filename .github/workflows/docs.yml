@@ -17,17 +17,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install poetry
-        run: pipx install poetry==1.3.1
+#      - name: Install poetry
+#        run: pipx install poetry==1.3.1
+
+#      - name: setup Python cache
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: '3.10'
+#          cache: poetry
 
       - name: setup Python cache
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          cache: poetry
+          cache: pip
+#
+#      - name: Install requirements
+#        run: poetry install --only docs
 
       - name: Install requirements
-        run: poetry install --only docs
+        run: pip install mkdocs mkdocs-material
 
       - name: (Re)build docs
         run: poetry run mkdocs build
