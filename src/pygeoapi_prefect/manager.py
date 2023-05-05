@@ -6,6 +6,7 @@ from pathlib import Path
 
 import anyio
 from prefect import flow
+from prefect.blocks.core import Block
 from prefect.client.orchestration import get_client
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
@@ -27,7 +28,6 @@ from pygeoapi.process.base import BaseProcessor
 from pygeoapi.process.manager.base import BaseManager
 
 from .process.base import BasePrefectProcessor
-from .util import get_storage_file_system
 
 logger = logging.getLogger(__name__)
 
@@ -256,17 +256,10 @@ class PrefectManager(BaseManager):
           full advantage of prefect's features
         """
         processor = self.get_processor(process_id)
-        print(f"processor: {processor}")
-        logger.info(f"info processor: {processor}")
-        logger.warning(f"warning processor: {processor}")
         chosen_mode, additional_headers = self._select_execution_mode(
             requested_execution_mode, processor
         )
-        print(f"chosen_mode: {chosen_mode}")
-        print(f"additional_headers: {additional_headers}")
         job_id = str(uuid.uuid4())
-        print(f"job_id: {job_id}")
-        print(f"is prefect processor: {isinstance(processor, BasePrefectProcessor)}")
         if isinstance(processor, BasePrefectProcessor):
             job_status = self._execute_prefect_processor(
                 job_id, processor, chosen_mode, execution_request
@@ -300,7 +293,7 @@ class PrefectManager(BaseManager):
         processor = self.get_processor(process_id)
         if isinstance(processor, BasePrefectProcessor):
             if (sb := processor.result_storage_block) is not None:
-                file_system = get_storage_file_system(sb)
+                file_system = Block.load(sb)
                 result = file_system.read_path(generated_output.location)
             else:
                 result = super().get_output_data_raw(generated_output, process_id)
@@ -324,6 +317,7 @@ class PrefectManager(BaseManager):
         except MissingResult as err:
             logger.warning(f"Could not get flow_run results: {err}")
             generated_outputs = None
+        execution_request = ExecuteRequest(**flow_run.parameters["execution_request"])
         return JobStatusInfoInternal(
             jobID=job_id,
             status=self.prefect_state_map[flow_run.state_type],
@@ -331,6 +325,8 @@ class PrefectManager(BaseManager):
             created=flow_run.created,
             started=flow_run.start_time,
             finished=flow_run.end_time,
+            requested_response_type=execution_request.response,
+            requested_outputs=execution_request.outputs,
             generated_outputs=generated_outputs,
         )
 

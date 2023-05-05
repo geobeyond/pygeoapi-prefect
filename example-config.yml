@@ -75,6 +75,18 @@ resources:
     processor:
       name: pygeoapi.process.hello_world.GreeterProcessor
 
+  simple-flow:
+    type: process
+    processor:
+      name: pygeoapi_prefect.examples.simple_prefect.SimpleFlowProcessor
+      prefect:
+        result_storage: remote-file-system/test-sb1-results
+        deployment:
+          name: minio
+          queue: pygeoapi
+          storage_block: remote-file-system/test-sb1
+          storage_sub_path: simple-flow-flow
+
   hi-prefect-world:
     type: process
     processor:

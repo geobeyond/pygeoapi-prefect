@@ -448,6 +448,92 @@ paths:
       summary: Process Hello World execution
       tags:
       - hello-world
+  /processes/hi-prefect-world:
+    get:
+      description: An example processor that is powered by prefect
+      operationId: describeHi-prefect-worldProcess
+      parameters:
+      - $ref: '#/components/parameters/f'
+      responses:
+        '200':
+          $ref: '#/components/responses/200'
+        default:
+          $ref: '#/components/responses/default'
+      summary: Get process metadata
+      tags:
+      - hi-prefect-world
+  /processes/hi-prefect-world/execution:
+    post:
+      description: An example processor that is powered by prefect
+      operationId: executeHi-prefect-worldJob
+      requestBody:
+        content:
+          application/json:
+            example:
+              inputs:
+                name: spiderboy
+            schema:
+              $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/execute.yaml
+        description: Mandatory execute request JSON
+        required: true
+      responses:
+        '200':
+          $ref: '#/components/responses/200'
+        '201':
+          $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/responses/ExecuteAsync.yaml
+        '404':
+          $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/responses/NotFound.yaml
+        '500':
+          $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/responses/ServerError.yaml
+        default:
+          $ref: '#/components/responses/default'
+      summary: Process Hi prefect world Processor execution
+      tags:
+      - hi-prefect-world
+  /processes/simple-flow:
+    get:
+      description: An example processor that is powered by prefect and executes a
+        simple flow
+      operationId: describeSimple-flowProcess
+      parameters:
+      - $ref: '#/components/parameters/f'
+      responses:
+        '200':
+          $ref: '#/components/responses/200'
+        default:
+          $ref: '#/components/responses/default'
+      summary: Get process metadata
+      tags:
+      - simple-flow
+  /processes/simple-flow/execution:
+    post:
+      description: An example processor that is powered by prefect and executes a
+        simple flow
+      operationId: executeSimple-flowJob
+      requestBody:
+        content:
+          application/json:
+            example:
+              inputs:
+                name: spiderboy
+            schema:
+              $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/execute.yaml
+        description: Mandatory execute request JSON
+        required: true
+      responses:
+        '200':
+          $ref: '#/components/responses/200'
+        '201':
+          $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/responses/ExecuteAsync.yaml
+        '404':
+          $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/responses/NotFound.yaml
+        '500':
+          $ref: https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/responses/ServerError.yaml
+        default:
+          $ref: '#/components/responses/default'
+      summary: Process Simple flow Processor execution
+      tags:
+      - simple-flow
 servers:
 - description: pygeoapi provides an API to geospatial data
   url: http://localhost:5000
@@ -466,3 +552,8 @@ tags:
     greetings back as output. Intended to demonstrate a simple process with a single
     input.
   name: greeter
+- description: An example processor that is powered by prefect and executes a simple
+    flow
+  name: simple-flow
+- description: An example processor that is powered by prefect
+  name: hi-prefect-world
