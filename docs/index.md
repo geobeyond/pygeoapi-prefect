@@ -14,7 +14,7 @@ A [pygeoapi] job/process manager that enables running pygeoapi jobs as [prefect]
 
 ## Quickstart
 
-Follow the [user guide](user-guide.md) for installation and initial usage instructions.
+Follow the [user guide](user-guide/user-guide.md) for installation and initial usage instructions.
 
 
 ## License

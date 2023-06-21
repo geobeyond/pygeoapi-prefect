@@ -6,25 +6,36 @@ site_author: geobeyond
 edit_uri: edit/main/docs/
 
 nav:
-  - Home: index.md
-  - User Guide: user-guide.md
-  - Development: development.md
+  - Home: 'index.md'
+  - User Guide:
+      - Installation: 'user-guide/installation.md'
+      - Defining processes: 'user-guide/defining-processes.md'
+      - Running prefect: 'user-guide/prefect.md'
+      - Deployments: 'user-guide/deployments.md'
+      - Executing processes: 'user-guide/executing-processes.md'
+      - Complete example: 'user-guide/complete-example.md'
+  - Development: 'development.md'
 
 theme:
   name: material
   palette:
-    primary: orange
-    accent: light blue
+    primary: blue grey
+    accent: pink
   features:
+    - content.action.edit
+    - header.autohide
+    - navigation.footer
     - navigation.tabs
     - navigation.tabs.sticky
-    - content.action.edit
 
 markdown_extensions:
-  - toc:
-      permalink: true
   - admonition
+  - attr_list
+  - def_list
   - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: "!!python/name:materialx.emoji.twemoji"
+      emoji_generator: "!!python/name:materialx.emoji.to_svg"
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -32,3 +43,5 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - toc:
+      permalink: true
