@@ -1,11 +1,63 @@
 """Schemas used internally by the process manager."""
+
 import datetime as dt
 import enum
-import typing
-from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import pydantic
-from pygeoapi.util import JobStatus
+
+from pygeoapi.models.processes import JobStatus
+
+# from pygeoapi.util import JobStatus
+
+
+class Link(pydantic.BaseModel):
+    href: str
+    type_: Optional[str] = pydantic.Field(None, alias="type")
+    rel: Optional[str] = None
+    title: Optional[str] = None
+    href_lang: Optional[str] = pydantic.Field(None, alias="hreflang")
+
+    def as_link_header(self) -> str:
+        result = f"<{self.href}>"
+        fields = (
+            "rel",
+            "title",
+            "type_",
+            "href_lang",
+        )
+        for field_name in fields:
+            value = getattr(self, field_name, None)
+            if value is not None:
+                fragment = f'{self.__fields__[field_name].alias}="{value}"'
+                result = "; ".join((result, fragment))
+        return result
+
+
+class ProcessExecutionMode(enum.Enum):
+    sync_execute = "sync-execute"
+    async_execute = "async-execute"
+
+
+class RequestedProcessExecutionMode(enum.Enum):
+    wait = "wait"
+    respond_async = "respond-async"
+
+
+class ProcessOutputTransmissionMode(enum.Enum):
+    VALUE = "value"
+    REFERENCE = "reference"
+
+
+class ProcessResponseType(enum.Enum):
+    document = "document"
+    raw = "raw"
+
+
+class ProcessJobControlOption(enum.Enum):
+    SYNC_EXECUTE = "sync-execute"
+    ASYNC_EXECUTE = "async-execute"
+    DISMISS = "dismiss"
 
 
 class ProcessIOType(enum.Enum):
@@ -19,8 +71,8 @@ class ProcessIOType(enum.Enum):
 
 class ProcessIOFormat(enum.Enum):
     # this is built from:
-    # - the jsonschema spec at: https://json-schema.org/draft/2020-12/json-schema-validation.html#name-defined-formats
-    # - the OAPI - Processes spec (table 13) at: https://docs.ogc.org/is/18-062r2/18-062r2.html#ogc_process_description
+    # - the jsonschema spec at: https://json-schema.org/draft/2020-12/json-schema-validation.html#name-defined-formats  # noqa: E501
+    # - the OAPI - Processes spec (table 13) at: https://docs.ogc.org/is/18-062r2/18-062r2.html#ogc_process_description  # noqa: E501
     DATE_TIME = "date-time"
     DATE = "date"
     TIME = "time"
@@ -37,15 +89,18 @@ class ProcessIOFormat(enum.Enum):
     JSON_POINTER = "json-pointer"
     RELATIVE_JSON_POINTER = "relative-json-pointer"
     REGEX = "regex"
-    # the below `binary` entry does not seem to be defined in the jsonschema spec
-    # nor in OAPI - Processes - but it is mentioned in OAPI - Processes spec as an example
+    # the below `binary` entry does not seem to be defined in the jsonschema spec  # noqa: E501
+    # nor in OAPI - Processes - but it is mentioned in OAPI - Processes spec as an example  # noqa: E501
     BINARY = "binary"
-    GEOJSON_FEATURE_COLLECTION_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection"
+    GEOJSON_FEATURE_COLLECTION_URI = (
+        "http://www.opengis.net/def/format/ogcapi-processes/0/"
+        "geojson-feature-collection"
+    )
     GEOJSON_FEATURE_URI = (
         "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature"
     )
     GEOJSON_GEOMETRY_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
+        "http://www.opengis.net/def/format/ogcapi-processes/0/" "geojson-geometry"
     )
     OGC_BBOX_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/ogc-bbox"
     GEOJSON_FEATURE_COLLECTION_SHORT_CODE = "geojson-feature-collection"
@@ -54,190 +109,122 @@ class ProcessIOFormat(enum.Enum):
     OGC_BBOX_SHORT_CODE = "ogc-bbox"
 
 
-class ProcessJobControlOption(enum.Enum):
-    SYNC_EXECUTE = "sync-execute"
-    ASYNC_EXECUTE = "async-execute"
-    DISMISS = "dismiss"
-
-
-class ProcessOutputTransmissionMode(enum.Enum):
-    VALUE = "value"
-    REFERENCE = "reference"
-
-
-class ProcessResponseType(enum.Enum):
-    document = "document"
-    raw = "raw"
-
-
-class Link(pydantic.BaseModel):
-    href: str
-    type_: typing.Optional[str] = pydantic.Field(None, alias="type")
-    rel: typing.Optional[str] = None
-    title: typing.Optional[str] = None
-    href_lang: typing.Optional[str] = pydantic.Field(None, alias="hreflang")
-
-
-class ProcessMetadata(pydantic.BaseModel):
-    title: str | None = None
-    role: str | None = None
-    href: str | None = None
-
-
-class AdditionalProcessIOParameters(ProcessMetadata):
-    name: str
-    value: list[str | float | int | list[dict] | dict]
-
-
 # this is a 'pydantification' of the schema.yml fragment, as shown
 # on the OAPI - Processes spec
 class ProcessIOSchema(pydantic.BaseModel):
-    title: str | None
-    multiple_of: float | None = pydantic.Field(alias="multipleOf")
-    maximum: float | None
-    exclusive_maximum: bool = pydantic.Field(False, alias="exclusiveMaximum")
-    minimum: float | None
-    exclusive_minimum: bool = pydantic.Field(False, alias="exclusiveMinimum")
+    title: Optional[str] = None
+    multiple_of: Optional[float] = pydantic.Field(None, alias="multipleOf")
+    maximum: Optional[float] = None
+    exclusive_maximum: Optional[bool] = pydantic.Field(False, alias="exclusiveMaximum")
+    minimum: Optional[float] = None
+    exclusive_minimum: Optional[bool] = pydantic.Field(False, alias="exclusiveMinimum")
     max_length: int = pydantic.Field(None, ge=0, alias="maxLength")
     min_length: int = pydantic.Field(0, ge=0, alias="minLength")
-    pattern: str | None
-    max_items: int | None = pydantic.Field(None, ge=0, alias="maxItems")
-    min_items: int = pydantic.Field(0, ge=0, alias="minItems")
-    unique_items: bool = pydantic.Field(False, alias="uniqueItems")
-    max_properties: int | None = pydantic.Field(None, ge=0, alias="maxProperties")
-    min_properties: int = pydantic.Field(0, ge=0, alias="minProperties")
-    required: pydantic.conlist(str, min_items=1, unique_items=True) | None
-    enum: pydantic.conlist(typing.Any, min_items=1, unique_items=False) | None
-    type_: ProcessIOType | None = pydantic.Field(None, alias="type")
-    not_: typing.Optional["ProcessIOSchema"] = pydantic.Field(None, alias="not")
-    allOf: list["ProcessIOSchema"] | None
-    oneOf: list["ProcessIOSchema"] | None
-    anyOf: list["ProcessIOSchema"] | None
-    items: list["ProcessIOSchema"] | None
-    properties: typing.Optional["ProcessIOSchema"]
-    additional_properties: typing.Union[bool, "ProcessIOSchema"] = pydantic.Field(
+    pattern: Optional[str] = None
+    max_items: Optional[int] = pydantic.Field(None, ge=0, alias="maxItems")
+    min_items: Optional[int] = pydantic.Field(0, ge=0, alias="minItems")
+    unique_items: Optional[bool] = pydantic.Field(False, alias="uniqueItems")
+    max_properties: Optional[int] = pydantic.Field(None, ge=0, alias="maxProperties")
+    min_properties: Optional[int] = pydantic.Field(0, ge=0, alias="minProperties")
+    required: Optional[  # type: ignore [valid-type]
+        pydantic.conlist(str, min_items=1, unique_items=True)
+    ] = None
+    enum: Optional[  # type: ignore [valid-type]
+        pydantic.conlist(Any, min_items=1, unique_items=False)
+    ] = None
+    type_: Optional[ProcessIOType] = pydantic.Field(None, alias="type")
+    not_: Optional["ProcessIOSchema"] = pydantic.Field(None, alias="not")
+    allOf: Optional[List["ProcessIOSchema"]] = None
+    oneOf: Optional[List["ProcessIOSchema"]] = None
+    anyOf: Optional[List["ProcessIOSchema"]] = None
+    items: Optional[List["ProcessIOSchema"]] = None
+    properties: Optional["ProcessIOSchema"] = None
+    additional_properties: Optional[Union[bool, "ProcessIOSchema"]] = pydantic.Field(
         True, alias="additionalProperties"
     )
-    description: str | None
-    format_: ProcessIOFormat | None = pydantic.Field(None, alias="format")
-    default: pydantic.Json[dict] | None
-    nullable: bool = False
-    read_only: bool = pydantic.Field(False, alias="readOnly")
-    write_only: bool = pydantic.Field(False, alias="writeOnly")
-    example: pydantic.Json[dict] | None
-    deprecated: bool = False
-    content_media_type: str | None = pydantic.Field(None, alias="contentMediaType")
-    content_encoding: str | None = pydantic.Field(None, alias="contentEncoding")
-    content_schema: str | None = pydantic.Field(None, alias="contentSchema")
+    description: Optional[str] = None
+    format_: Optional[ProcessIOFormat] = pydantic.Field(None, alias="format")
+    default: Optional[pydantic.Json[dict]] = None
+    nullable: Optional[bool] = False
+    read_only: Optional[bool] = pydantic.Field(False, alias="readOnly")
+    write_only: Optional[bool] = pydantic.Field(False, alias="writeOnly")
+    example: Optional[pydantic.Json[dict]] = None
+    deprecated: Optional[bool] = False
+    content_media_type: Optional[str] = pydantic.Field(None, alias="contentMediaType")
+    content_encoding: Optional[str] = pydantic.Field(None, alias="contentEncoding")
+    content_schema: Optional[str] = pydantic.Field(None, alias="contentSchema")
 
     class Config:
         use_enum_values = True
 
 
 class ProcessOutput(pydantic.BaseModel):
-    title: str | None
-    description: str | None
+    title: Optional[str] = None
+    description: Optional[str] = None
     schema_: ProcessIOSchema = pydantic.Field(alias="schema")
 
 
-class ProcessInput(ProcessOutput):
-    keywords: list[str] | None
-    metadata: list[ProcessMetadata] | None
-    min_occurs: int = pydantic.Field(1, alias="minOccurs")
-    max_occurs: int | typing.Literal["unbounded"] = pydantic.Field(1, alias="maxOccurs")
-    additional_parameters: AdditionalProcessIOParameters | None
+class ProcessMetadata(pydantic.BaseModel):
+    title: Optional[str] = None
+    role: Optional[str] = None
+    href: Optional[str] = None
 
 
-class Process(pydantic.BaseModel):
-    title: dict[str, str]
-    description: dict[str, str]
-    keywords: list[str]
-    version: str
-    id: str
-    job_control_options: list[ProcessJobControlOption] = pydantic.Field(
-        alias="jobControlOptions"
-    )
-    output_transmission: list[ProcessOutputTransmissionMode] = pydantic.Field(
-        [ProcessOutputTransmissionMode.VALUE], alias="outputTransmission"
-    )
-    links: list[Link]
-
-    inputs: dict[str, ProcessInput]
-    outputs: dict[str, ProcessOutput]
-    example: typing.Optional[dict]
-
-
-class AdditionalParameter(pydantic.BaseModel):
+class AdditionalProcessIOParameters(ProcessMetadata):
     name: str
-    value: list[str | int | float | list[pydantic.Json] | pydantic.Json]
+    value: List[Union[str, float, int, List[Dict], Dict]]
+
+    class Config:
+        smart_union = True
 
 
-class AdditionalParameters(ProcessMetadata):
-    parameters: list[AdditionalParameter]
+class ProcessInput(ProcessOutput):
+    keywords: Optional[List[str]] = None
+    metadata: Optional[List[ProcessMetadata]] = None
+    min_occurs: int = pydantic.Field(1, alias="minOccurs")
+    max_occurs: Optional[Union[int, str]] = pydantic.Field(1, alias="maxOccurs")
+    additional_parameters: Optional[AdditionalProcessIOParameters] = None
 
 
 class ProcessSummary(pydantic.BaseModel):
-    """OAPI - Processes. Schema for a ProcessSummary."""
-
-    # definition from ProcessSummary
-    id: str
     version: str
-    job_control_options: list[ProcessJobControlOption] | None = pydantic.Field(
-        None, alias="jobControlOptions"
+    id: str
+    title: Optional[Union[Dict[str, str], str]] = None
+    description: Optional[Union[Dict[str, str], str]] = None
+    keywords: Optional[List[str]] = None
+    job_control_options: Optional[List[ProcessJobControlOption]] = pydantic.Field(
+        [ProcessJobControlOption.SYNC_EXECUTE], alias="jobControlOptions"
     )
-    output_transmission: list[ProcessOutputTransmissionMode] | None = pydantic.Field(
-        None, alias="outputTransmission"
+    output_transmission: Optional[List[ProcessOutputTransmissionMode]] = pydantic.Field(
+        [ProcessOutputTransmissionMode.VALUE], alias="outputTransmission"
     )
-    links: list[Link] | None = None
+    links: Optional[List[Link]] = None
 
-    # definition from descriptionType
-    title: dict[str, str] | None = None
-    description: dict[str, str] | None = None
-    keywords: list[str] | None = None
-    metadata: list[ProcessMetadata] | None = None
-    additional_parameters: AdditionalParameters | None = pydantic.Field(
-        None, alias="additionalParameters"
-    )
+    class Config:
+        use_enum_values = True
 
 
-class JobStatusInfo(pydantic.BaseModel):
-    """OAPI - Processes. Schema for a StatusInfo."""
-
-    job_id: str = pydantic.Field(..., alias="jobID")
-    status: JobStatus
-    type: typing.Literal["process"] = "process"
-    process_id: str = pydantic.Field(..., alias="processID")
-    message: str | None
-    created: dt.datetime | None
-    started: dt.datetime | None
-    finished: dt.datetime | None
-    updated: dt.datetime | None
-    progress: int | None = pydantic.Field(None, ge=0, le=100)
-    links: list[Link] | None
-
-
-class ProcessManagerConfig(pydantic.BaseModel):
-    # this is taken from the schema definition of pygeoapi config
-    name: str
-    connection: str
-    output_dir: str
+class ProcessDescription(ProcessSummary):
+    inputs: Dict[str, ProcessInput]
+    outputs: Dict[str, ProcessOutput]
+    example: Optional[dict]
 
 
 class ExecutionInputBBox(pydantic.BaseModel):
-    bbox: list[float] = pydantic.Field(..., min_items=4, max_items=4)
-    crs: typing.Optional[str] = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+    bbox: List[float] = pydantic.Field(..., min_items=4, max_items=4)
+    crs: Optional[str] = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 
 
 class ExecutionInputValueNoObjectArray(pydantic.BaseModel):
-    __root__: typing.List[
-        typing.Union[ExecutionInputBBox, int, str, "ExecutionInputValueNoObjectArray"]
+    __root__: List[
+        Union[ExecutionInputBBox, int, str, "ExecutionInputValueNoObjectArray"]
     ]
 
 
 class ExecutionInputValueNoObject(pydantic.BaseModel):
     """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
 
-    __root__: typing.Union[
+    __root__: Union[
         ExecutionInputBBox,
         bool,
         float,
@@ -253,26 +240,24 @@ class ExecutionInputValueNoObject(pydantic.BaseModel):
 class ExecutionFormat(pydantic.BaseModel):
     """Models the `format.yml` schema defined in OAPIP."""
 
-    media_type: typing.Optional[str] = pydantic.Field(None, alias="mediaType")
-    encoding: typing.Optional[str]
-    schema_: typing.Optional[typing.Union[str, dict]] = pydantic.Field(
-        None, alias="schema"
-    )
+    media_type: Optional[str] = pydantic.Field(None, alias="mediaType")
+    encoding: Optional[str]
+    schema_: Optional[Union[str, dict]] = pydantic.Field(None, alias="schema")
 
 
 class ExecutionQualifiedInputValue(pydantic.BaseModel):
     """Models the `qualifiedInputValue.yml` schema defined in OAPIP."""
 
-    value: typing.Union[ExecutionInputValueNoObject, dict]
-    format_: typing.Optional[ExecutionFormat] = None
+    value: Union[ExecutionInputValueNoObject, dict]
+    format_: Optional[ExecutionFormat] = None
 
 
 class ExecutionOutput(pydantic.BaseModel):
     """Models the `output.yml` schema defined in OAPIP."""
 
-    format_: typing.Optional[ExecutionFormat] = pydantic.Field(None, alias="format")
-    transmission_mode: typing.Optional[ProcessOutputTransmissionMode] = pydantic.Field(
-        ProcessOutputTransmissionMode.VALUE, alias="transmissionMode"
+    format_: Optional[ExecutionFormat] = pydantic.Field(None, alias="format")
+    transmission_mode: Optional[ProcessOutputTransmissionMode] = pydantic.Field(
+        ProcessOutputTransmissionMode.VALUE.value, alias="transmissionMode"
     )
 
     class Config:
@@ -283,22 +268,22 @@ class ExecutionSubscriber(pydantic.BaseModel):
     """Models the `subscriber.yml` schema defined in OAPIP."""
 
     success_uri: str = pydantic.Field(..., alias="successUri")
-    in_progress_uri: typing.Optional[str] = pydantic.Field(None, alias="inProgressUri")
-    failed_uri: typing.Optional[str] = pydantic.Field(None, alias="failedUri")
+    in_progress_uri: Optional[str] = pydantic.Field(None, alias="inProgressUri")
+    failed_uri: Optional[str] = pydantic.Field(None, alias="failedUri")
 
 
-class Execution(pydantic.BaseModel):
+class ExecuteRequest(pydantic.BaseModel):
     """Models the `execute.yml` schema defined in OAPIP."""
 
-    inputs: typing.Optional[
-        typing.Dict[
+    inputs: Optional[
+        Dict[
             str,
-            typing.Union[
+            Union[
                 ExecutionInputValueNoObject,
                 ExecutionQualifiedInputValue,
                 Link,
-                typing.List[
-                    typing.Union[
+                List[
+                    Union[
                         ExecutionInputValueNoObject,
                         ExecutionQualifiedInputValue,
                         Link,
@@ -307,9 +292,45 @@ class Execution(pydantic.BaseModel):
             ],
         ]
     ] = None
-    outputs: typing.Optional[typing.Dict[str, ExecutionOutput]] = None
-    response: typing.Optional[ProcessResponseType] = ProcessResponseType.raw
-    subscriber: typing.Optional[ExecutionSubscriber] = None
+    outputs: Optional[Dict[str, ExecutionOutput]] = None
+    response: Optional[ProcessResponseType] = ProcessResponseType.raw
+    subscriber: Optional[ExecutionSubscriber] = None
 
     class Config:
         use_enum_values = True
+
+
+class OutputExecutionResultInternal(pydantic.BaseModel):
+    location: str
+    media_type: str
+
+
+class ExecutionDocumentSingleOutput(pydantic.BaseModel):
+    __root__: Union[
+        ExecutionInputValueNoObject,
+        ExecutionQualifiedInputValue,
+        Link,
+    ]
+
+
+class ExecutionDocumentResult(pydantic.BaseModel):
+    __root__: Dict[str, ExecutionDocumentSingleOutput]
+
+
+class JobStatusInfoBase(pydantic.BaseModel):
+    job_id: str = pydantic.Field(..., alias="jobID")
+    process_id: Optional[str] = pydantic.Field(None, alias="processID")
+    status: JobStatus
+    message: Optional[str] = None
+    created: Optional[dt.datetime] = None
+    started: Optional[dt.datetime] = None
+    finished: Optional[dt.datetime] = None
+    updated: Optional[dt.datetime] = None
+    progress: Optional[int] = pydantic.Field(None, ge=0, le=100)
+
+
+class JobStatusInfoInternal(JobStatusInfoBase):
+    negotiated_execution_mode: Optional[ProcessExecutionMode] = None
+    requested_response_type: Optional[ProcessResponseType] = None
+    requested_outputs: Optional[Dict[str, ExecutionOutput]] = None
+    generated_outputs: Optional[Dict[str, OutputExecutionResultInternal]] = None

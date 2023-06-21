@@ -15,7 +15,21 @@ from prefect.server.schemas import filters
 from prefect.server.schemas.core import Flow
 from prefect.server.schemas.states import StateType
 from prefect.task_runners import ConcurrentTaskRunner
-from pygeoapi.models.processes import (
+
+# from pygeoapi.models.processes import (
+#     ExecuteRequest,
+#     JobStatus,
+#     JobStatusInfoInternal,
+#     ProcessExecutionMode,
+#     OutputExecutionResultInternal,
+#     RequestedProcessExecutionMode,
+# )
+from pygeoapi.process import exceptions
+from pygeoapi.process.base import BaseProcessor
+from pygeoapi.process.manager.base import BaseManager
+
+from .process.base import BasePrefectProcessor
+from .schemas import (
     ExecuteRequest,
     JobStatus,
     JobStatusInfoInternal,
@@ -23,11 +37,6 @@ from pygeoapi.models.processes import (
     OutputExecutionResultInternal,
     RequestedProcessExecutionMode,
 )
-from pygeoapi.process import exceptions
-from pygeoapi.process.base import BaseProcessor
-from pygeoapi.process.manager.base import BaseManager
-
-from .process.base import BasePrefectProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +67,22 @@ class PrefectManager(BaseManager):
         StateType.CANCELLING: JobStatus.dismissed,
     }
 
+    def add_job(self, job_metadata: dict) -> str:
+        """Add a job.
+
+        This method is part of the ``pygeoapi.BaseManager`` API. However, in
+        the context of prefect we do not need it.
+        """
+        raise NotImplementedError
+
+    def update_job(self, job_id: str, update_dict: dict) -> bool:
+        """Update an existing job.
+
+        This method is part of the ``pygeoapi.BaseManager`` API. However, in
+        the context of prefect we do not need it.
+        """
+        raise NotImplementedError
+
     def get_jobs(
         self,
         type_: list[str] | None = None,
@@ -69,7 +94,11 @@ class PrefectManager(BaseManager):
         limit: int | None = 10,
         offset: int | None = 0,
     ) -> tuple[int, list[JobStatusInfoInternal]]:
-        """Get a list of jobs, optionally filtered by relevant parameters."""
+        """Get a list of jobs, optionally filtered by relevant parameters.
+
+        Job list filters are not implemented in pygeoapi yet though, so for
+        the moment it is not possible to use them.
+        """
         if status is not None:
             prefect_states = []
             for k, v in self.prefect_state_map.items():
@@ -99,13 +128,15 @@ class PrefectManager(BaseManager):
         return len(flow_runs), jobs
 
     def _job_id_to_flow_run_name(self, job_id: str) -> str:
+        """Convert input job_id onto corresponding prefect flow_run name."""
         return f"{self._flow_run_name_prefix}{job_id}"
 
     def _flow_run_name_to_job_id(self, flow_run_name: str) -> str:
+        """Convert input flow_run name onto corresponding pygeoapi job_id."""
         return flow_run_name.replace(self._flow_run_name_prefix, "")
 
     def get_job(self, job_id: str) -> JobStatusInfoInternal:
-        """Get a job."""
+        """Get job details."""
         flow_run_name = self._job_id_to_flow_run_name(job_id)
         flow_run_details = anyio.run(_get_prefect_flow_run, flow_run_name)
         if flow_run_details is None:
@@ -114,9 +145,11 @@ class PrefectManager(BaseManager):
             flow_run, prefect_flow = flow_run_details
             return self._flow_run_to_job_status(flow_run, prefect_flow)
 
-    def delete_job(self, job_id: str) -> JobStatusInfoInternal:
+    def delete_job(  # type: ignore [empty-body]
+        self, job_id: str
+    ) -> JobStatusInfoInternal:
         """Delete a job and associated results/ouptuts."""
-        ...
+        pass
 
     def _select_execution_mode(
         self, requested: RequestedProcessExecutionMode | None, processor: BaseProcessor
@@ -249,11 +282,13 @@ class PrefectManager(BaseManager):
         This manager is able to execute two types of processes:
 
         - Normal pygeoapi processes, i.e. those that derive from
-          `pygeoapi.process.base.BaseProcessor`. These are made into prefect flows and
-          are run with prefect.
+          `pygeoapi.process.base.BaseProcessor`. These are made into prefect flows
+          and are run with prefect. These always run locally.
+
         - Custom prefect-aware processes, which derive from
           `pygeoapi_prefect.processes.base.BasePrefectProcessor`. These are able to take
-          full advantage of prefect's features
+          full advantage of prefect's features, which includes running elsewhere, as
+          defined by deployments.
         """
         processor = self.get_processor(process_id)
         chosen_mode, additional_headers = self._select_execution_mode(
@@ -269,22 +304,6 @@ class PrefectManager(BaseManager):
                 job_id, processor, execution_request
             )
         return job_status, additional_headers
-
-    def add_job(self, job_metadata: dict) -> str:
-        """Add a job.
-
-        This method is part of the ``pygeoapi.BaseManager`` API. However, in
-        the context of prefect we do not need it.
-        """
-        raise NotImplementedError
-
-    def update_job(self, job_id: str, update_dict: dict) -> bool:
-        """Update an existing job.
-
-        This method is part of the ``pygeoapi.BaseManager`` API. However, in
-        the context of prefect we do not need it.
-        """
-        raise NotImplementedError
 
     def get_output_data_raw(
         self, generated_output: OutputExecutionResultInternal, process_id: str
@@ -334,6 +353,7 @@ class PrefectManager(BaseManager):
 async def _get_prefect_flow_runs(
     states: list[StateType] | None = None, name_like: str | None = None
 ) -> list[FlowRun]:
+    """Retrieve existing prefect flow_runs, optionally filtered by state and name"""
     if states is not None:
         state_filter = filters.FlowRunFilterState(
             type=filters.FlowRunFilterStateType(any_=states)
@@ -355,6 +375,7 @@ async def _get_prefect_flow_runs(
 
 
 async def _get_prefect_flow_run(flow_run_name: str) -> tuple[FlowRun, Flow] | None:
+    """Retrieve prefect flow_run details."""
     async with get_client() as client:
         flow_runs = await client.read_flow_runs(
             flow_run_filter=filters.FlowRunFilter(
@@ -372,5 +393,6 @@ async def _get_prefect_flow_run(flow_run_name: str) -> tuple[FlowRun, Flow] | No
 
 
 async def _get_prefect_flow(flow_id: uuid.UUID) -> Flow:
+    """Retrive prefect flow details."""
     async with get_client() as client:
         return await client.read_flow(flow_id)
