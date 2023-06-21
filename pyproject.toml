@@ -30,8 +30,8 @@ optional = true
 mkdocs = "^1.4.3"
 mkdocs-material = "^9.1.9"
 
-[tool.poetry.scripts]
-pygeoapi-prefect = "pygeoapi_prefect.cli:root"
+[tool.poetry.plugins."pygeoapi"]
+prefect = "pygeoapi_prefect.cli:root"
 
 [build-system]
 requires = ["poetry-core"]
