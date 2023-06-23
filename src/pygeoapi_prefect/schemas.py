@@ -6,9 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import pydantic
 
-from pygeoapi.models.processes import JobStatus
-
-# from pygeoapi.util import JobStatus
+from pygeoapi.util import JobStatus
 
 
 class Link(pydantic.BaseModel):

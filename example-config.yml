@@ -70,10 +70,10 @@ resources:
     processor:
       name: HelloWorld
 
-  greeter:
-    type: process
-    processor:
-      name: pygeoapi.process.hello_world.GreeterProcessor
+#  greeter:
+#    type: process
+#    processor:
+#      name: pygeoapi.process.hello_world.GreeterProcessor
 
   simple-flow:
     type: process

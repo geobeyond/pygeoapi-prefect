@@ -2,11 +2,12 @@ import abc
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Dict
 
-import pygeoapi.models.processes as schemas
 from prefect import Flow
 from pygeoapi.process.base import BaseProcessor
+
+from .. import schemas
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +20,12 @@ class PrefectDeployment:
     storage_sub_path: str | None = None
 
 
-class BasePrefectProcessor(BaseProcessor):
+class BasePrefectProcessor(BaseProcessor, abc.ABC):
     deployment_info: PrefectDeployment | None
     result_storage_block: str | None
 
     def __init__(self, processor_def: dict):
-        super().__init__(processor_def)
+        super().__init__(processor_def, process_metadata=None)
         if (depl := processor_def.get("prefect", {}).get("deployment")) is not None:
             self.deployment_info = PrefectDeployment(
                 depl["name"],
@@ -36,6 +37,48 @@ class BasePrefectProcessor(BaseProcessor):
             self.deployment_info = None
         if (sb := processor_def.get("prefect", {}).get("result_storage")) is not None:
             self.result_storage_block = sb
+
+    @property
+    def metadata(self) -> Dict:
+        """Compatibility with pygeoapi's BaseProcessor.
+
+        Contrary to pygeoapi, which stores process metadata as a plain dictionary,
+        pygeoapi-prefect rather uses a `schemas.ProcessDescription` instance instead.
+        As pygeoapi expects to be able to read a processor property
+        named `metadata` this property converts the process_description into
+        a dict when needed.
+        """
+
+        # do we even need this? - maybe the pygeoapi.openapi needs it?
+        return self.process_description.dict(exclude_none=True, by_alias=True)
+
+    @metadata.setter
+    def metadata(self, metadata: Dict):
+        """Compatibility with pygeoapi's BaseProcessor.
+
+        pygeoapi-prefect does not store processor description as a plain
+        dict.
+
+        This setter does nothing. A processor's metadata is not supposed to
+        change at runtime - therefore, the only time it is written into is
+        during initialization. Since pygeoapi-prefect expects to get processor
+        info from the `process_description` property and uses this `metadata`
+        property just for compatibility with pygeoapi, it is safe to ignore
+        attempts at writing to `self.metadata`
+        """
+        pass
+
+    @property
+    @abc.abstractmethod
+    def process_description(self) -> schemas.ProcessDescription:
+        """Return process-related description.
+
+        Note that derived classes are free to implement this as either a
+        property function or, perhaps more simply, as a class variable. Look
+        at ``pygeoapi.process.hello_world.HelloWorldProcessor`` for an
+        example.
+        """
+        ...
 
     @property
     @abc.abstractmethod

@@ -1,5 +1,4 @@
 """Example pygeoapi process"""
-import pygeoapi.models.processes as schemas
 from prefect import (
     flow,
     get_run_logger,
@@ -12,6 +11,7 @@ from prefect.task_runners import SequentialTaskRunner
 
 # don't perform relative imports because otherwise prefect deployment won't
 # work properly
+from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
 
 

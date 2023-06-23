@@ -153,6 +153,12 @@ up in a custom pygeoapi processor. This processor must:
 
 A simple example, meant to work together with [the prefect flow defined earlier](#implement-process-as-a-prefect-flow):
 
+!!! warning
+
+    Inside your custom processor modules be sure to use absolute imports. Otherwise the prefect deployment may not be
+    able to find all of your code's dependencies.
+
+
 ```python
 from prefect import flow
 from pygeoapi.models import processes as schemas

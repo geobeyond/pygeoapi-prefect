@@ -2,9 +2,13 @@
 
 import logging
 import uuid
-from pathlib import Path
+from typing import (
+    Any,
+    Optional,
+)
 
 import anyio
+import httpx
 from prefect import flow
 from prefect.blocks.core import Block
 from prefect.client.orchestration import get_client
@@ -16,22 +20,14 @@ from prefect.server.schemas.core import Flow
 from prefect.server.schemas.states import StateType
 from prefect.task_runners import ConcurrentTaskRunner
 
-# from pygeoapi.models.processes import (
-#     ExecuteRequest,
-#     JobStatus,
-#     JobStatusInfoInternal,
-#     ProcessExecutionMode,
-#     OutputExecutionResultInternal,
-#     RequestedProcessExecutionMode,
-# )
 from pygeoapi.process import exceptions
 from pygeoapi.process.base import BaseProcessor
 from pygeoapi.process.manager.base import BaseManager
+from pygeoapi.util import JobStatus
 
 from .process.base import BasePrefectProcessor
 from .schemas import (
     ExecuteRequest,
-    JobStatus,
     JobStatusInfoInternal,
     ProcessExecutionMode,
     OutputExecutionResultInternal,
@@ -52,8 +48,12 @@ class PrefectManager(BaseManager):
     job id.
     """
 
-    is_async: bool = True
+    # is_async: bool = True
     _flow_run_name_prefix = "pygeoapi_job_"
+
+    def __init__(self, manager_def: dict):
+        super().__init__(manager_def)
+        self.is_async = True
 
     prefect_state_map = {
         StateType.SCHEDULED: JobStatus.accepted,
@@ -93,11 +93,11 @@ class PrefectManager(BaseManager):
         max_duration_seconds: int | None = None,
         limit: int | None = 10,
         offset: int | None = 0,
-    ) -> tuple[int, list[JobStatusInfoInternal]]:
+    ) -> list[JobStatusInfoInternal]:
         """Get a list of jobs, optionally filtered by relevant parameters.
 
         Job list filters are not implemented in pygeoapi yet though, so for
-        the moment it is not possible to use them.
+        the moment it is not possible to use them for filtering jobs.
         """
         if status is not None:
             prefect_states = []
@@ -112,9 +112,16 @@ class PrefectManager(BaseManager):
                 StateType.CANCELLED,
                 StateType.CANCELLING,
             ]
-        flow_runs = anyio.run(
-            _get_prefect_flow_runs, prefect_states, self._flow_run_name_prefix
-        )
+        try:
+            flow_runs = anyio.run(
+                _get_prefect_flow_runs, prefect_states, self._flow_run_name_prefix
+            )
+        except httpx.ConnectError as err:
+            # TODO: would be more explicit to raise an exception,
+            #  but pygeoapi is not able to handle this yet
+            logger.error(f"Could not connect to prefect server: {str(err)}")
+            flow_runs = []
+
         seen_flows = {}
         jobs = []
         for flow_run in flow_runs:
@@ -125,7 +132,7 @@ class PrefectManager(BaseManager):
                 flow_run, seen_flows[flow_run.flow_id]
             )
             jobs.append(job_status)
-        return len(flow_runs), jobs
+        return jobs
 
     def _job_id_to_flow_run_name(self, job_id: str) -> str:
         """Convert input job_id onto corresponding prefect flow_run name."""
@@ -138,7 +145,14 @@ class PrefectManager(BaseManager):
     def get_job(self, job_id: str) -> JobStatusInfoInternal:
         """Get job details."""
         flow_run_name = self._job_id_to_flow_run_name(job_id)
-        flow_run_details = anyio.run(_get_prefect_flow_run, flow_run_name)
+        try:
+            flow_run_details = anyio.run(_get_prefect_flow_run, flow_run_name)
+        except httpx.ConnectError as err:
+            # TODO: would be more explicit to raise an exception,
+            #  but pygeoapi is not able to handle this yet
+            logger.error(f"Could not connect to prefect server: {str(err)}")
+            flow_run_details = None
+
         if flow_run_details is None:
             raise exceptions.JobNotFoundError()
         else:
@@ -243,9 +257,11 @@ class PrefectManager(BaseManager):
     ) -> JobStatusInfoInternal:
         """Execute a regular pygeoapi process via prefect."""
 
+        execution_parameters = execution_request.dict(by_alias=True)
+
         @flow(
-            name=processor.process_description.id,
-            version=processor.process_description.version,
+            name=processor.metadata["id"],
+            version=processor.metadata["version"],
             flow_run_name=self._job_id_to_flow_run_name(job_id),
             persist_result=True,
             log_prints=True,
@@ -255,23 +271,52 @@ class PrefectManager(BaseManager):
             retry_delay_seconds=0,  # this should be configurable
             timeout_seconds=None,  # this should be configurable
         )
-        def executor(
-            job_id_: str,
-            execution_request_: ExecuteRequest,
-            results_storage_root: Path,
-            # progress_reporter=Callable[[JobStatusInfoInternal], bool]
-        ):
-            """Run a vanilla pygeoapi process as a prefect flow."""
-            return processor.execute(
-                job_id_,
-                execution_request_,
-                results_storage_root=results_storage_root,
-                # progress_reporter=progress_reporter
-            )
+        def executor(data_: dict):
+            """Run a vanilla pygeoapi process as a prefect flow.
 
-        return executor(job_id, execution_request, self.output_dir)
+            Since we are adapting a vanilla pygeoapi processor to run with
+            prefect, we must ensure the processor is called with the expected
+            parameters.
+            """
+            return processor.execute(data_)
+
+        return executor(execution_parameters)
 
     def execute_process(
+        self,
+        process_id: str,
+        data_dict: dict,
+        execution_mode: Optional[RequestedProcessExecutionMode] = None,
+    ) -> tuple[str, Any, JobStatus, Optional[dict[str, str]]]:
+        """pygeoapi compatibility method.
+
+        Contrary to pygeoapi, which stores requested execution parameters as
+        a plain dictionary, pygeoapi-prefect rather uses a
+        `schemas.ExecuteRequest` instance instead - this allows parsing the
+        input data with the pydantic models crafted from the OGC API -
+        Processes schemas. Thus, this method performs a light validation of the
+        input data, converts it from a dict to a proper ExecuteRequest and
+        forwards it to the `_execute` method, where execution is handled.
+        Finally, it receives whatever results are generated and converts
+        back to the data structure expected by pygeoapi.
+        """
+        # this can raise a pydantic validation error
+        execution_request = ExecuteRequest(**data_dict)
+
+        job_status, additional_headers = self._execute(
+            process_id=process_id,
+            execution_request=execution_request,
+            requested_execution_mode=execution_mode,
+        )
+        return (
+            job_status.job_id,
+            None,  # mimetype?
+            None,  # outputs?
+            job_status.status,
+            additional_headers,
+        )
+
+    def _execute(
         self,
         process_id: str,
         execution_request: ExecuteRequest,
