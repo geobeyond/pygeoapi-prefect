@@ -5,7 +5,7 @@ from prefect import (
 )
 from prefect.blocks.core import Block
 from prefect.filesystems import LocalFileSystem
-from pygeoapi.process import exceptions
+from pygeoapi_prefect import exceptions
 
 # don't perform relative imports because otherwise prefect deployment won't
 # work properly

@@ -91,16 +91,19 @@ class ProcessIOFormat(enum.Enum):
     # nor in OAPI - Processes - but it is mentioned in OAPI - Processes spec as an example  # noqa: E501
     BINARY = "binary"
     GEOJSON_FEATURE_COLLECTION_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/"
+        "http://www.opengis.net/def/format/ogcapi-processes/0/"  # noqa
         "geojson-feature-collection"
     )
     GEOJSON_FEATURE_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature"
+        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature"  # noqa
     )
     GEOJSON_GEOMETRY_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/" "geojson-geometry"
+        "http://www.opengis.net/def/format/ogcapi-processes/0/"
+        "geojson-geometry"  # noqa
     )
-    OGC_BBOX_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/ogc-bbox"
+    OGC_BBOX_URI = (
+        "http://www.opengis.net/def/format/ogcapi-processes/0/ogc-bbox"  # noqa
+    )
     GEOJSON_FEATURE_COLLECTION_SHORT_CODE = "geojson-feature-collection"
     GEOJSON_FEATURE_SHORT_CODE = "geojson-feature"
     GEOJSON_GEOMETRY_SHORT_CODE = "geojson-geometry"
@@ -110,6 +113,8 @@ class ProcessIOFormat(enum.Enum):
 # this is a 'pydantification' of the schema.yml fragment, as shown
 # on the OAPI - Processes spec
 class ProcessIOSchema(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(use_enum_values=True)
+
     title: Optional[str] = None
     multiple_of: Optional[float] = pydantic.Field(None, alias="multipleOf")
     maximum: Optional[float] = None
@@ -124,11 +129,11 @@ class ProcessIOSchema(pydantic.BaseModel):
     unique_items: Optional[bool] = pydantic.Field(False, alias="uniqueItems")
     max_properties: Optional[int] = pydantic.Field(None, ge=0, alias="maxProperties")
     min_properties: Optional[int] = pydantic.Field(0, ge=0, alias="minProperties")
-    required: Optional[  # type: ignore [valid-type]
-        pydantic.conlist(str, min_items=1, unique_items=True)
+    required: Optional[  # type: ignore[valid-type]
+        pydantic.conset(str, min_length=1)
     ] = None
-    enum: Optional[  # type: ignore [valid-type]
-        pydantic.conlist(Any, min_items=1, unique_items=False)
+    enum: Optional[  # type: ignore[valid-type]
+        pydantic.conset(Any, min_length=1)
     ] = None
     type_: Optional[ProcessIOType] = pydantic.Field(None, alias="type")
     not_: Optional["ProcessIOSchema"] = pydantic.Field(None, alias="not")
@@ -152,9 +157,6 @@ class ProcessIOSchema(pydantic.BaseModel):
     content_encoding: Optional[str] = pydantic.Field(None, alias="contentEncoding")
     content_schema: Optional[str] = pydantic.Field(None, alias="contentSchema")
 
-    class Config:
-        use_enum_values = True
-
 
 class ProcessOutput(pydantic.BaseModel):
     title: Optional[str] = None
@@ -172,9 +174,6 @@ class AdditionalProcessIOParameters(ProcessMetadata):
     name: str
     value: List[Union[str, float, int, List[Dict], Dict]]
 
-    class Config:
-        smart_union = True
-
 
 class ProcessInput(ProcessOutput):
     keywords: Optional[List[str]] = None
@@ -185,6 +184,8 @@ class ProcessInput(ProcessOutput):
 
 
 class ProcessSummary(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(use_enum_values=True)
+
     version: str
     id: str
     title: Optional[Union[Dict[str, str], str]] = None
@@ -198,9 +199,6 @@ class ProcessSummary(pydantic.BaseModel):
     )
     links: Optional[List[Link]] = None
 
-    class Config:
-        use_enum_values = True
-
 
 class ProcessDescription(ProcessSummary):
     inputs: Dict[str, ProcessInput]
@@ -210,19 +208,17 @@ class ProcessDescription(ProcessSummary):
 
 class ExecutionInputBBox(pydantic.BaseModel):
     bbox: List[float] = pydantic.Field(..., min_items=4, max_items=4)
-    crs: Optional[str] = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+    crs: Optional[str] = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"  # noqa
 
 
-class ExecutionInputValueNoObjectArray(pydantic.BaseModel):
-    __root__: List[
-        Union[ExecutionInputBBox, int, str, "ExecutionInputValueNoObjectArray"]
-    ]
+class ExecutionInputValueNoObjectArray(pydantic.RootModel):
+    root: List[Union[ExecutionInputBBox, int, str, "ExecutionInputValueNoObjectArray"]]
 
 
-class ExecutionInputValueNoObject(pydantic.BaseModel):
-    """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
+class ExecutionInputValueNoObject(pydantic.RootModel):
+    """Models the `inputValueNoObject.yml` schema defined in OAProc."""
 
-    __root__: Union[
+    root: Union[
         ExecutionInputBBox,
         bool,
         float,
@@ -231,12 +227,9 @@ class ExecutionInputValueNoObject(pydantic.BaseModel):
         str,
     ]
 
-    class Config:
-        smart_union = True
-
 
 class ExecutionFormat(pydantic.BaseModel):
-    """Models the `format.yml` schema defined in OAPIP."""
+    """Models the `format.yml` schema defined in OAProc."""
 
     media_type: Optional[str] = pydantic.Field(None, alias="mediaType")
     encoding: Optional[str]
@@ -244,26 +237,25 @@ class ExecutionFormat(pydantic.BaseModel):
 
 
 class ExecutionQualifiedInputValue(pydantic.BaseModel):
-    """Models the `qualifiedInputValue.yml` schema defined in OAPIP."""
+    """Models the `qualifiedInputValue.yml` schema defined in OAProc."""
 
     value: Union[ExecutionInputValueNoObject, dict]
     format_: Optional[ExecutionFormat] = None
 
 
 class ExecutionOutput(pydantic.BaseModel):
-    """Models the `output.yml` schema defined in OAPIP."""
+    """Models the `output.yml` schema defined in OAProc."""
+
+    model_config = pydantic.ConfigDict(use_enum_values=True)
 
     format_: Optional[ExecutionFormat] = pydantic.Field(None, alias="format")
     transmission_mode: Optional[ProcessOutputTransmissionMode] = pydantic.Field(
         ProcessOutputTransmissionMode.VALUE.value, alias="transmissionMode"
     )
 
-    class Config:
-        use_enum_values = True
-
 
 class ExecutionSubscriber(pydantic.BaseModel):
-    """Models the `subscriber.yml` schema defined in OAPIP."""
+    """Models the `subscriber.yml` schema defined in OAProc."""
 
     success_uri: str = pydantic.Field(..., alias="successUri")
     in_progress_uri: Optional[str] = pydantic.Field(None, alias="inProgressUri")
@@ -271,7 +263,9 @@ class ExecutionSubscriber(pydantic.BaseModel):
 
 
 class ExecuteRequest(pydantic.BaseModel):
-    """Models the `execute.yml` schema defined in OAPIP."""
+    """Models the `execute.yml` schema defined in OAProc."""
+
+    model_config = pydantic.ConfigDict(use_enum_values=True)
 
     inputs: Optional[
         Dict[
@@ -294,25 +288,22 @@ class ExecuteRequest(pydantic.BaseModel):
     response: Optional[ProcessResponseType] = ProcessResponseType.raw
     subscriber: Optional[ExecutionSubscriber] = None
 
-    class Config:
-        use_enum_values = True
-
 
 class OutputExecutionResultInternal(pydantic.BaseModel):
     location: str
     media_type: str
 
 
-class ExecutionDocumentSingleOutput(pydantic.BaseModel):
-    __root__: Union[
+class ExecutionDocumentSingleOutput(pydantic.RootModel):
+    root: Union[
         ExecutionInputValueNoObject,
         ExecutionQualifiedInputValue,
         Link,
     ]
 
 
-class ExecutionDocumentResult(pydantic.BaseModel):
-    __root__: Dict[str, ExecutionDocumentSingleOutput]
+class ExecutionDocumentResult(pydantic.RootModel):
+    root: Dict[str, ExecutionDocumentSingleOutput]
 
 
 class JobStatusInfoBase(pydantic.BaseModel):

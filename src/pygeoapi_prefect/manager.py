@@ -20,8 +20,10 @@ from prefect.server.schemas.core import Flow
 from prefect.server.schemas.states import StateType
 from prefect.task_runners import ConcurrentTaskRunner
 
-from pygeoapi.process import exceptions
-from pygeoapi.process.base import BaseProcessor
+from pygeoapi.process.base import (
+    BaseProcessor,
+    JobNotFoundError,
+)
 from pygeoapi.process.manager.base import BaseManager
 from pygeoapi.util import JobStatus
 
@@ -154,12 +156,12 @@ class PrefectManager(BaseManager):
             flow_run_details = None
 
         if flow_run_details is None:
-            raise exceptions.JobNotFoundError()
+            raise JobNotFoundError()
         else:
             flow_run, prefect_flow = flow_run_details
             return self._flow_run_to_job_status(flow_run, prefect_flow)
 
-    def delete_job(  # type: ignore [empty-body]
+    def delete_job(  # type: ignore[empty-body]
         self, job_id: str
     ) -> JobStatusInfoInternal:
         """Delete a job and associated results/ouptuts."""

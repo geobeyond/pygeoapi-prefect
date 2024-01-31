@@ -9,7 +9,7 @@ cd pygeoapi-prefect
 poetry install
 ```
 
-Check the [Development](development.md) section for a more developer oriented
+Check the [Development](../development.md) section for a more developer oriented
 installation procedure
 
 

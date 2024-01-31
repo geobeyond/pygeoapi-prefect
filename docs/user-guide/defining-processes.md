@@ -39,7 +39,7 @@ As such, in order to use prefect-powered processes you will need to:
 
 !!! note
 
-    We recommend getting having the [prefect docs](https://docs.prefect.io/latest/) at hand when defining new flows.
+    We recommend having the [prefect docs](https://docs.prefect.io/latest/) at hand when defining new flows.
 
 
 pygeoapi-prefect is able to use regular prefect flows. However, they must meet the following requirements:

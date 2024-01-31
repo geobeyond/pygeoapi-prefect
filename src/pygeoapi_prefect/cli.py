@@ -5,7 +5,7 @@ from prefect.blocks.core import Block
 from prefect.deployments import Deployment
 from prefect.filesystems import RemoteFileSystem
 from pygeoapi.process.manager import get_manager
-from pygeoapi.process import exceptions
+from pygeoapi.process.base import UnknownProcessError
 from pygeoapi.util import yaml_load
 
 from .process.base import BasePrefectProcessor
@@ -13,6 +13,7 @@ from .process.base import BasePrefectProcessor
 
 @click.group(name="prefect")
 def root():
+    """Commands provided by the pygeoapi-prefect package."""
     ...
 
 
@@ -22,7 +23,7 @@ def root():
 @click.argument("endpoint_url")
 @click.argument("key")
 @click.argument("secret")
-def create_storage_block(
+def create_remote_storage_block(
     block_name: str, base_path: str, endpoint_url: str, key: str, secret: str
 ):
     """Create storage block of type 'remote-file-system' on the prefect server
@@ -59,7 +60,16 @@ def create_storage_block(
 
 @root.command()
 @click.argument("process_id")
-@click.option("-c", "--pygeoapi-config", type=Path, envvar="PYGEOAPI_CONFIG")
+@click.option(
+    "-c",
+    "--pygeoapi-config",
+    type=Path,
+    envvar="PYGEOAPI_CONFIG",
+    help=(
+        "pygeoapi configuration file path. This can also be specified "
+        "by the PYGEOAPI_CONFIG environment variable"
+    ),
+)
 def deploy_process(
     process_id: str,
     pygeoapi_config: Path,
@@ -74,7 +84,7 @@ def deploy_process(
     manager = get_manager(config)
     try:
         processor = manager.get_processor(process_id)
-    except exceptions.UnknownProcessError as err:
+    except UnknownProcessError as err:
         raise click.BadParameter(f"Process {process_id!r} not found") from err
     else:
         if isinstance(processor, BasePrefectProcessor):
@@ -90,7 +100,6 @@ def deploy_process(
                     work_queue_name=processor.deployment_info.queue,
                     storage=storage,
                     path=processor.deployment_info.storage_sub_path,
-                    ignore_file=None,
                 )
                 deployment.apply()
                 print("Done!")

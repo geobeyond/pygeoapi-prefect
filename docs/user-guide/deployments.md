@@ -12,7 +12,7 @@ A prefect deployment thus stores metadata about the storage location of a flow's
 
 Deployments are inspected by the prefect agent when it is time to run a scheduled flow. these are used by the agent to:
 
-- Retrieve flow code from it storage location and make it available for execution
+- Retrieve flow code from its storage location and make it available for execution
 - Set up a suitable execution environment for the flow run. For example: spin up a docker container and install Python
   dependencies
 

@@ -11,8 +11,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pydantic = "^1.10.7"
-prefect = "^2.9.0"
+pydantic = "^2.6.0"
+prefect = "^2.14.18"
 click = "8.0.0"  # this version is fixed in order to be compatible with upstream pygeoapi
 pygeoapi = {path = "../../pygeoapi", develop = true}
 

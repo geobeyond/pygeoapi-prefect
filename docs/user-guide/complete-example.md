@@ -8,6 +8,25 @@ We will configure pygeoapi to use minIO for both:
 - Storing process execution outputs
 - Storing the deployed flow code
 
+In order to follow along, ensure you have:
+
+- prefect server running
+- your local prefect config has `PREFECT_API_URL=<url-of-your-server>`
+
+!!! NOTE
+
+    If you are running prefect by using the supplied `docker/compose.yaml` docker
+    compose stack, prefect server will be running locally on port 44200, which is not
+    the standard port. In this case it may be easier to create a prefect profile and use
+    that:
+
+    ```sh
+    # you must have prefect installed locally
+    prefect profile create pygeoapi-prefect-dev
+    prefect profile use pygeoapi-prefect-dev
+    prefect config set PREFECT_API_URL=http://0.0.0.0:44200
+    ```
+
 
 Let's start by standing up a local docker container with minIO:
 
@@ -33,7 +52,10 @@ CLI command shipped by pygeoapi-prefect or create the block using prefect UI.
 Using the pygeoapi-prefect CLI command:
 
 ```shell
-pygeoapi plugins prefect create-storage-block \
+export PYGEOAPI_CONFIG=example-config.yml
+export PYGEOAPI_OPENAPI=example-openapi.yml
+
+pygeoapi plugins prefect create-remote-storage-block \
     test-sb1 \
     s3://pygeoapi-test \
     http://localhost:9000 \
@@ -60,6 +82,24 @@ Using the Prefect UI you would create a block of type _Remote File System_:
 ## Implement process code and configure pygeoapi
 
 For this example we are using the example flow that is shipped with pygeoapi-prefect.
+Use the following configuration:
+
+```yaml
+# pygeoapi configuration file: example-config.yml
+
+resources:
+  simple-flow:
+    type: process
+    processor:
+      name: pygeoapi_prefect.examples.simple_prefect.SimpleFlowProcessor
+      prefect:
+        result_storage: remote-file-system/test-sb1-results
+        deployment:
+          name: minio
+          queue: pygeoapi
+          storage_block: remote-file-system/test-sb1
+          storage_sub_path: simple-flow-flow
+```
 
 
 ## Deploy process
@@ -72,7 +112,7 @@ export PYGEOAPI_CONFIG=example-config.yml
 poetry run pygeoapi plugins prefect deploy-process hi-prefect-world
 ```
 
-This results in prefect creating a deployment named `hi-prefect-world/test`, and since we are specifying a storage
+This results in prefect creating a deployment named `hi-prefect-world/minio`, and since we are specifying a storage
 block, prefect also uploads the flow code onto the storage (which is the minIO bucket created previously).
 
 You can verify this step by:

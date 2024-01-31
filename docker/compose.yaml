@@ -1,0 +1,40 @@
+# Base docker-compose file
+#
+# This file has the main compose configuration for running the project. Specialize it into suitable `dev` and `ci`
+# stacks in the `docker-compose.dev.yml` and `docker-compose.ci` files, as needed
+
+name: pygeoapi-prefect
+
+services:
+
+  prefect-server:
+    image: prefecthq/prefect:2-python3.10
+    ports:
+      - target: 4200
+        published: 44200
+    environment:
+      PREFECT_UI_API_URL: "http://localhost:44200/api"
+    command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+
+  prefect-agent:
+    image: prefecthq/prefect:2-python3.10
+    environment:
+      PREFECT_API_URL: "http://prefect-server:4200/api"
+    command: ["prefect", "agent", "start", "-q", "pygeoapi"]
+
+  minio:
+    image: quay.io/minio/minio
+    ports:
+      - target: 9000
+        published: 9000
+      - target: 9090
+        published: 9090
+    environment:
+      MINIO_ROOT_USER: tester
+      MINIO_ROOT_PASSWORD: 12345678
+    volumes:
+      - minio-data:/data
+    command: ["server", "/data", "--console-address", ":9090"]
+
+volumes:
+  minio-data:
