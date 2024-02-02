@@ -15,6 +15,7 @@ pydantic = "^2.6.0"
 prefect = "^2.14.18"
 click = "8.0.0"  # this version is fixed in order to be compatible with upstream pygeoapi
 pygeoapi = {path = "../../pygeoapi", develop = true}
+uvicorn = "^0.27.0.post1"
 
 
 [tool.poetry.group.dev.dependencies]

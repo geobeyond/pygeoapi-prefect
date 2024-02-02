@@ -288,7 +288,7 @@ class PrefectManager(BaseManager):
         self,
         process_id: str,
         data_dict: dict,
-        execution_mode: Optional[RequestedProcessExecutionMode] = None,
+        requested_execution_mode: Optional[RequestedProcessExecutionMode] = None,
     ) -> tuple[str, Any, JobStatus, Optional[dict[str, str]]]:
         """pygeoapi compatibility method.
 
@@ -303,12 +303,19 @@ class PrefectManager(BaseManager):
         back to the data structure expected by pygeoapi.
         """
         # this can raise a pydantic validation error
-        execution_request = ExecuteRequest(**data_dict)
+        logger.info(f"{data_dict=}")
+        execution_request = ExecuteRequest(
+            inputs=data_dict,
+            outputs=None,  # not implemented in pygeoapi yet
+            response=None,  # not implemented in pygeoapi yet
+            subscriber=None,  # not implemented in pygeoapi yet
+        )
+        logger.info(f"{execution_request=}")
 
         job_status, additional_headers = self._execute(
             process_id=process_id,
             execution_request=execution_request,
-            requested_execution_mode=execution_mode,
+            requested_execution_mode=requested_execution_mode,
         )
         return (
             job_status.job_id,

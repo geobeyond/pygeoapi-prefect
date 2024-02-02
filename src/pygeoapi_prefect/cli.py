@@ -100,6 +100,9 @@ def deploy_process(
                     work_queue_name=processor.deployment_info.queue,
                     storage=storage,
                     path=processor.deployment_info.storage_sub_path,
+                    ignore_file=(
+                        processor.deployment_info.ignore_file or ".prefectignore"
+                    ),
                 )
                 deployment.apply()
                 print("Done!")

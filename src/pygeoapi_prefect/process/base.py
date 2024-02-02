@@ -18,6 +18,7 @@ class PrefectDeployment:
     queue: str
     storage_block: str | None = None
     storage_sub_path: str | None = None
+    ignore_file: str | None = None
 
 
 class BasePrefectProcessor(BaseProcessor, abc.ABC):
@@ -32,6 +33,7 @@ class BasePrefectProcessor(BaseProcessor, abc.ABC):
                 depl["queue"],
                 storage_block=depl.get("storage_block"),
                 storage_sub_path=depl.get("storage_sub_path"),
+                ignore_file=depl.get("ignore_file"),
             )
         else:
             self.deployment_info = None

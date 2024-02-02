@@ -86,6 +86,7 @@ resources:
           queue: pygeoapi
           storage_block: remote-file-system/test-sb1
           storage_sub_path: simple-flow-flow
+          ignore_file: .prefectignore
 
   hi-prefect-world:
     type: process
@@ -98,3 +99,4 @@ resources:
           queue: pygeoapi
           storage_block: remote-file-system/test-sb1
           storage_sub_path: hi-prefect-world-flow
+          ignore_file: .prefectignore

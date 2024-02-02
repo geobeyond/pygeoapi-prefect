@@ -28,8 +28,27 @@ poetry run prefect agent start --work-queue pygeoapi
 Now stand up pygeoapi with the provided config files:
 
 ```shell
-PYGEOAPI_CONFIG=example-config.yml PYGEOAPI_OPENAPI=example-openapi.yml poetry run pygeoapi serve
+export PYGEOAPI_INSTALL_DIR=${HOME}/dev/pygeoapi
+export PYGEOAPI_CONFIG=example-config.yml
+export PYGEOAPI_OPENAPI=example-openapi.yml
+
+poetry run uvicorn \
+       --reload \
+       --reload-dir=${PYGEOAPI_INSTALL_DIR} \
+       --reload-dir=$(pwd) \
+       --reload-include='*.py' \
+       --reload-include='*.yml' \
+       --host=0.0.0.0 \
+       --port=5000 \
+       --log-level=debug \
+       --log-config=dev-log-config.yaml \
+       pygeoapi.starlette_app:APP
 ```
+
+!!! NOTE
+
+    It is preferable to call `uvicorn` directly from the CLI over using `pygeoapi serve` as
+    that will allow setting custom uvicorn flags, like the log config
 
 If you need to regenerate the openapi description file, run:
 
