@@ -10,4 +10,4 @@ A process manager for [pygeoapi] that uses [prefect].
 ## Installation
 
 In time, this project will be available in the python package index (AKA pypi) and be installable via pip, but for
-now you can install it by git cloning and then using poetry to install
+now you can install it by git cloning and then using uv to install

@@ -10,36 +10,36 @@ pygeoapi-prefect is a process/job manager for PyGeoAPI that uses Prefect for wor
 
 ```bash
 # Install with dev dependencies
-poetry install --with dev
+uv sync --group dev
 
 # Run pre-commit checks (ruff, black, mypy)
-poetry run pre-commit run --all-files
+uv run pre-commit run --all-files
 
 # Run tests
-poetry run pytest tests/
+uv run pytest tests/
 
 # Build documentation
-poetry run mkdocs build
+uv run mkdocs build
 ```
 
 ## Running Locally
 
 ```bash
 # Start Prefect server (terminal 1)
-poetry run prefect server start
+uv run prefect server start
 
 # Configure and start agent (terminal 2)
-poetry run prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
-poetry run prefect agent start --work-queue pygeoapi
+uv run prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
+uv run prefect agent start --work-queue pygeoapi
 
 # Start PyGeoAPI (terminal 3)
-PYGEOAPI_CONFIG=example-config.yml PYGEOAPI_OPENAPI=example-openapi.yml poetry run pygeoapi serve
+PYGEOAPI_CONFIG=example-config.yml PYGEOAPI_OPENAPI=example-openapi.yml uv run pygeoapi serve
 
 # Deploy a process flow
-poetry run pygeoapi-prefect deploy-process hi-prefect-world --pygeoapi-config example-config.yml
+uv run pygeoapi-prefect deploy-process hi-prefect-world --pygeoapi-config example-config.yml
 
 # Regenerate OpenAPI spec after config changes
-poetry run pygeoapi openapi generate example-config.yml > example-openapi.yml
+uv run pygeoapi openapi generate example-config.yml > example-openapi.yml
 ```
 
 ## Architecture
@@ -76,7 +76,7 @@ def process_flow(
 
 - Uses Pydantic v1.x (1.10.7)
 - Click pinned to 8.0.0 for pygeoapi compatibility
-- Requires local pygeoapi installation (path-based dependency in pyproject.toml)
+- Requires local pygeoapi installation (path dependency configured in `[tool.uv.sources]`)
 - Uses anyio for async Prefect API communication
 
 ## Configuration
