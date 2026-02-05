@@ -1,4 +1,5 @@
 """Example pygeoapi process"""
+
 from prefect import (
     flow,
     get_run_logger,
@@ -70,8 +71,7 @@ class SimpleFlowProcessor(BasePrefectProcessor):
         version="0.0.1",
         title="Simple flow Processor",
         description=(
-            "An example processor that is powered by prefect and executes a "
-            "simple flow"
+            "An example processor that is powered by prefect and executes a simple flow"
         ),
         jobControlOptions=[
             schemas.ProcessJobControlOption.SYNC_EXECUTE,

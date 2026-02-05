@@ -4,7 +4,7 @@ Install this project with uv
 
 ```shell
 git clone
-uv sync --group dev
+uv sync
 ```
 
 Start the prefect server:

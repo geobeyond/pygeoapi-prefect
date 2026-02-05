@@ -1,4 +1,5 @@
 """Example pygeoapi process"""
+
 from prefect import (
     flow,
     get_run_logger,

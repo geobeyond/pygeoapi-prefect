@@ -98,7 +98,7 @@ class ProcessIOFormat(enum.Enum):
         "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature"
     )
     GEOJSON_GEOMETRY_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/" "geojson-geometry"
+        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
     )
     OGC_BBOX_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/ogc-bbox"
     GEOJSON_FEATURE_COLLECTION_SHORT_CODE = "geojson-feature-collection"
