@@ -1,52 +1,52 @@
 # Development
 
-Install this project with poetry
+Install this project with uv
 
 ```shell
 git clone
-poetry install --with dev
+uv sync --group dev
 ```
 
 Start the prefect server:
 
 ```shell
-poetry run prefect server start
+uv run prefect server start
 ```
 
 Update the prefect config, as directed by the prefect server:
 
 ```shell
-poetry run prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
+uv run prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
 ```
 
 If you want to deploy a pygeoapi process locally with prefect, then also start a prefect agent:
 
 ```shell
-poetry run prefect agent start --work-queue pygeoapi
+uv run prefect agent start --work-queue pygeoapi
 ```
 
 Now stand up pygeoapi with the provided config files:
 
 ```shell
-PYGEOAPI_CONFIG=example-config.yml PYGEOAPI_OPENAPI=example-openapi.yml poetry run pygeoapi serve
+PYGEOAPI_CONFIG=example-config.yml PYGEOAPI_OPENAPI=example-openapi.yml uv run pygeoapi serve
 ```
 
 If you need to regenerate the openapi description file, run:
 
 ```shell
-poetry run pygeoapi openapi generate example-config.yml > example-openapi.yml
+uv run pygeoapi openapi generate example-config.yml > example-openapi.yml
 ```
 
 Deploy the `hi-prefect-world` process:
 
 ```shell
-poetry run pygeoapi-prefect deploy-as-prefect-flow hi-prefect-world
+uv run pygeoapi-prefect deploy-as-prefect-flow hi-prefect-world
 ```
 
 - Run a deployed process with prefect
 
 ```shell
-poetry run prefect deployment run --param
+uv run prefect deployment run --param
 ```
 
 
