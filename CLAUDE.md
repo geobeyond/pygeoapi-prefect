@@ -9,8 +9,8 @@ pygeoapi-prefect is a process/job manager for PyGeoAPI that uses Prefect for wor
 ## Development Commands
 
 ```bash
-# Install with dev dependencies
-uv sync --group dev
+# Install dependencies (includes dev group by default)
+uv sync
 
 # Run pre-commit checks (ruff, black, mypy)
 uv run pre-commit run --all-files

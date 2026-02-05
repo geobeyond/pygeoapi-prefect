@@ -169,12 +169,10 @@ class PrefectManager(BaseManager):
         """Delete a job and associated results/ouptuts."""
         pass
 
-
-
     def _select_execution_mode(
-            self,
-            requested: Optional[RequestedProcessExecutionMode],
-            processor: BaseProcessor
+        self,
+        requested: Optional[RequestedProcessExecutionMode],
+        processor: BaseProcessor,
     ) -> tuple[ProcessExecutionMode, dict[str, str]]:
         """Select the execution mode to be employed
 
@@ -187,30 +185,31 @@ class PrefectManager(BaseManager):
         if requested == RequestedProcessExecutionMode.respond_async:
             # client wants async - do we support it?
             process_supports_async = (
-                    ProcessExecutionMode.async_execute.value in
-                    processor.process_description.job_control_options
+                ProcessExecutionMode.async_execute.value
+                in processor.process_description.job_control_options
             )
             if self.is_async and process_supports_async:
                 chosen_mode = ProcessExecutionMode.async_execute
                 additional_headers = {
-                    'Preference-Applied': (
-                        RequestedProcessExecutionMode.respond_async.value)
+                    "Preference-Applied": (
+                        RequestedProcessExecutionMode.respond_async.value
+                    )
                 }
             else:
                 chosen_mode = ProcessExecutionMode.sync_execute
                 additional_headers = {
-                    'Preference-Applied': (
-                        RequestedProcessExecutionMode.wait.value)
+                    "Preference-Applied": (RequestedProcessExecutionMode.wait.value)
                 }
         elif requested == RequestedProcessExecutionMode.wait:
             # client wants sync - pygeoapi implicitly supports sync mode
-            logger.debug('Synchronous execution')
+            logger.debug("Synchronous execution")
             chosen_mode = ProcessExecutionMode.sync_execute
             additional_headers = {
-                'Preference-Applied': RequestedProcessExecutionMode.wait.value}
+                "Preference-Applied": RequestedProcessExecutionMode.wait.value
+            }
         else:  # client has no preference
             # according to OAPI - Processes spec we ought to respond with sync
-            logger.debug('Synchronous execution')
+            logger.debug("Synchronous execution")
             chosen_mode = ProcessExecutionMode.sync_execute
             additional_headers = {}
 
@@ -221,9 +220,9 @@ class PrefectManager(BaseManager):
                 "Switching to sync"
             )
             chosen_mode = ProcessExecutionMode.sync_execute
-            additional_headers[
-                "Preference-Applied"
-            ] = RequestedProcessExecutionMode.wait.value
+            additional_headers["Preference-Applied"] = (
+                RequestedProcessExecutionMode.wait.value
+            )
         return chosen_mode, additional_headers
 
     def _execute_prefect_processor(
@@ -286,7 +285,8 @@ class PrefectManager(BaseManager):
             else:
                 logger.info("asynchronous execution")
                 run_deployment(
-                    **run_kwargs, timeout=0  # has the effect of returning immediately
+                    **run_kwargs,
+                    timeout=0,  # has the effect of returning immediately
                 )
         updated_status_info = self.get_job(job_id)
         logger.info(f"updated_status_info: {updated_status_info}")
@@ -297,7 +297,7 @@ class PrefectManager(BaseManager):
         job_id: str,
         processor: BaseProcessor,
         execution_request: ExecuteRequest,
-    # ) -> JobStatusInfoInternal:
+        # ) -> JobStatusInfoInternal:
     ) -> tuple[str, Any, JobStatus]:
         """Execute a regular pygeoapi process via prefect.
 
@@ -308,8 +308,7 @@ class PrefectManager(BaseManager):
         manager's behavior of saving generated outputs to disk.
         """
 
-        execution_parameters = execution_request.dict(
-            by_alias=True, exclude_none=True)
+        execution_parameters = execution_request.dict(by_alias=True, exclude_none=True)
         input_parameters = execution_parameters.get("inputs", {})
         logger.warning(f"{execution_parameters=}")
         logger.warning(f"{input_parameters=}")
@@ -347,16 +346,18 @@ class PrefectManager(BaseManager):
             # now try to save outputs to local disk, similarly to what the
             # `pygeoapi.BaseManager._execute_handler_sync()` method does
             filename = f"{processor.metadata['id']}-{job_id}"
-            job_path = self.output_dir / filename if self.output_dir is not None else None
+            job_path = (
+                self.output_dir / filename if self.output_dir is not None else None
+            )
 
             if job_path is not None:
-                logger.debug(f'writing output to {job_path}')
+                logger.debug(f"writing output to {job_path}")
                 if isinstance(generated_output, dict):
-                    mode = 'w'
+                    mode = "w"
                     data = json.dumps(generated_output, sort_keys=True, indent=4)
-                    encoding = 'utf-8'
+                    encoding = "utf-8"
                 else:
-                    mode = 'wb'
+                    mode = "wb"
                     data = generated_output
                     encoding = None
                 with job_path.open(mode=mode, encoding=encoding) as fh:
@@ -410,13 +411,9 @@ class PrefectManager(BaseManager):
             execution_request=execution_request,
             requested_execution_mode=execution_mode,
         )
-        (
-            job_id,
-            output_media_type,
-            generated_output,
-            status,
-            additional_headers
-        ) = execution_result
+        (job_id, output_media_type, generated_output, status, additional_headers) = (
+            execution_result
+        )
         return (
             job_id,
             output_media_type,
@@ -464,7 +461,7 @@ class PrefectManager(BaseManager):
             output_media_type,
             generated_output,
             current_job_status,
-            additional_headers
+            additional_headers,
         )
 
     def get_output_data_raw(

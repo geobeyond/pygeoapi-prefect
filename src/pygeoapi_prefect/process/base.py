@@ -82,8 +82,7 @@ class BasePrefectProcessor(BaseProcessor, abc.ABC):
 
     @property
     @abc.abstractmethod
-    def process_flow(self) -> Flow:
-        ...
+    def process_flow(self) -> Flow: ...
 
     def execute(
         self,

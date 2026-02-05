@@ -12,8 +12,7 @@ from .process.base import BasePrefectProcessor
 
 
 @click.group(name="prefect")
-def root():
-    ...
+def root(): ...
 
 
 @root.command()
@@ -97,7 +96,4 @@ def deploy_process(
             else:
                 raise click.Abort("Deployment not specified in pygeoapi config file")
         else:
-            print(
-                f"Process {process_id!r} is not deployable with "
-                f"prefect, skipping..."
-            )
+            print(f"Process {process_id!r} is not deployable with prefect, skipping...")
