@@ -2,7 +2,7 @@
 
 import datetime as dt
 import enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Union
 
 import pydantic
 
@@ -11,23 +11,18 @@ from pygeoapi.util import JobStatus
 
 class Link(pydantic.BaseModel):
     href: str
-    type_: Optional[str] = pydantic.Field(None, alias="type")
-    rel: Optional[str] = None
-    title: Optional[str] = None
-    href_lang: Optional[str] = pydantic.Field(None, alias="hreflang")
+    rel: str
+    type_: Annotated[str | None, pydantic.Field(alias="type")] = None
+    title: str | None = None
+    href_lang: Annotated[str | None, pydantic.Field(alias="hreflang")] = None
 
     def as_link_header(self) -> str:
         result = f"<{self.href}>"
-        fields = (
-            "rel",
-            "title",
-            "type_",
-            "href_lang",
-        )
-        for field_name in fields:
-            value = getattr(self, field_name, None)
-            if value is not None:
-                fragment = f'{self.__fields__[field_name].alias}="{value}"'
+        for field_name, field_info in self.__class__.model_fields.items():
+            if field_name == "href":
+                continue
+            if (value := getattr(self, field_name, None)) is not None:
+                fragment = f'{field_info.alias or field_name}="{value}"'
                 result = "; ".join((result, fragment))
         return result
 
@@ -110,192 +105,183 @@ class ProcessIOFormat(enum.Enum):
 # this is a 'pydantification' of the schema.yml fragment, as shown
 # on the OAPI - Processes spec
 class ProcessIOSchema(pydantic.BaseModel):
-    title: Optional[str] = None
-    multiple_of: Optional[float] = pydantic.Field(None, alias="multipleOf")
-    maximum: Optional[float] = None
-    exclusive_maximum: Optional[bool] = pydantic.Field(False, alias="exclusiveMaximum")
-    minimum: Optional[float] = None
-    exclusive_minimum: Optional[bool] = pydantic.Field(False, alias="exclusiveMinimum")
-    max_length: int = pydantic.Field(None, ge=0, alias="maxLength")
-    min_length: int = pydantic.Field(0, ge=0, alias="minLength")
-    pattern: Optional[str] = None
-    max_items: Optional[int] = pydantic.Field(None, ge=0, alias="maxItems")
-    min_items: Optional[int] = pydantic.Field(0, ge=0, alias="minItems")
-    unique_items: Optional[bool] = pydantic.Field(False, alias="uniqueItems")
-    max_properties: Optional[int] = pydantic.Field(None, ge=0, alias="maxProperties")
-    min_properties: Optional[int] = pydantic.Field(0, ge=0, alias="minProperties")
-    required: Optional[  # type: ignore [valid-type]
-        pydantic.conlist(str, min_items=1, unique_items=True)
-    ] = None
-    enum: Optional[  # type: ignore [valid-type]
-        pydantic.conlist(Any, min_items=1, unique_items=False)
-    ] = None
-    type_: Optional[ProcessIOType] = pydantic.Field(None, alias="type")
-    not_: Optional["ProcessIOSchema"] = pydantic.Field(None, alias="not")
-    allOf: Optional[List["ProcessIOSchema"]] = None
-    oneOf: Optional[List["ProcessIOSchema"]] = None
-    anyOf: Optional[List["ProcessIOSchema"]] = None
-    items: Optional[List["ProcessIOSchema"]] = None
-    properties: Optional["ProcessIOSchema"] = None
-    additional_properties: Optional[Union[bool, "ProcessIOSchema"]] = pydantic.Field(
-        True, alias="additionalProperties"
-    )
-    description: Optional[str] = None
-    format_: Optional[ProcessIOFormat] = pydantic.Field(None, alias="format")
-    default: Optional[pydantic.Json[dict]] = None
-    nullable: Optional[bool] = False
-    read_only: Optional[bool] = pydantic.Field(False, alias="readOnly")
-    write_only: Optional[bool] = pydantic.Field(False, alias="writeOnly")
-    example: Optional[pydantic.Json[dict]] = None
-    deprecated: Optional[bool] = False
-    content_media_type: Optional[str] = pydantic.Field(None, alias="contentMediaType")
-    content_encoding: Optional[str] = pydantic.Field(None, alias="contentEncoding")
-    content_schema: Optional[str] = pydantic.Field(None, alias="contentSchema")
+    model_config = pydantic.ConfigDict(use_enum_values=True)
 
-    class Config:
-        use_enum_values = True
+    title: str | None = None
+    multiple_of: Annotated[float | None, pydantic.Field(alias="multipleOf")] = None
+    maximum: float | None = None
+    exclusive_maximum: Annotated[bool | None, pydantic.Field(alias="exclusiveMaximum")] = False
+    minimum: float | None = None
+    exclusive_minimum: Annotated[bool | None, pydantic.Field(alias="exclusiveMinimum")] = False
+    max_length: Annotated[int | None, pydantic.Field(ge=0, alias="maxLength")] = None
+    min_length: Annotated[int, pydantic.Field(ge=0, alias="minLength")] = 0
+    pattern: str | None = None
+    max_items: Annotated[int | None, pydantic.Field(ge=0, alias="maxItems")] = None
+    min_items: Annotated[int, pydantic.Field(ge=0, alias="minItems")] = 0
+    unique_items: Annotated[bool | None, pydantic.Field(alias="uniqueItems")] = False
+    max_properties: Annotated[int | None, pydantic.Field(ge=0, alias="maxProperties")] = None
+    min_properties: Annotated[int, pydantic.Field(ge=0, alias="minProperties")] = 0
+    required: list[str] | None = None
+    enum: list[Any] | None = None
+    type_: Annotated[ProcessIOType | None, pydantic.Field(alias="type")] = None
+    not_: Annotated["ProcessIOSchema | None", pydantic.Field(alias="not")] = None
+    allOf: list["ProcessIOSchema"] | None = None
+    oneOf: list["ProcessIOSchema"] | None = None
+    anyOf: list["ProcessIOSchema"] | None = None
+    items: list["ProcessIOSchema"] | None = None
+    properties: "ProcessIOSchema | None" = None
+    additional_properties: Annotated[
+        bool | "ProcessIOSchema" | None,
+        pydantic.Field(alias="additionalProperties")
+    ] = True
+    description: str | None = None
+    format_: Annotated[ProcessIOFormat | None, pydantic.Field(alias="format")] = None
+    default: dict | None = None
+    nullable: bool | None = False
+    read_only: Annotated[bool | None, pydantic.Field(alias="readOnly")] = False
+    write_only: Annotated[bool | None, pydantic.Field(alias="writeOnly")] = False
+    example: dict | None = None
+    deprecated: bool | None = False
+    content_media_type: Annotated[str | None, pydantic.Field(alias="contentMediaType")] = None
+    content_encoding: Annotated[str | None, pydantic.Field(alias="contentEncoding")] = None
+    content_schema: Annotated[str | None, pydantic.Field(alias="contentSchema")] = None
 
 
 class ProcessOutput(pydantic.BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    schema_: ProcessIOSchema = pydantic.Field(alias="schema")
+    title: str | None = None
+    description: str | None = None
+    schema_: Annotated[ProcessIOSchema, pydantic.Field(alias="schema")]
 
 
 class ProcessMetadata(pydantic.BaseModel):
-    title: Optional[str] = None
-    role: Optional[str] = None
-    href: Optional[str] = None
+    title: str | None = None
+    role: str | None = None
+    href: str | None = None
 
 
 class AdditionalProcessIOParameters(ProcessMetadata):
     name: str
-    value: List[Union[str, float, int, List[Dict], Dict]]
-
-    class Config:
-        smart_union = True
+    value: list[str | float | int | list[dict] | dict]
 
 
 class ProcessInput(ProcessOutput):
-    keywords: Optional[List[str]] = None
-    metadata: Optional[List[ProcessMetadata]] = None
-    min_occurs: int = pydantic.Field(1, alias="minOccurs")
-    max_occurs: Optional[Union[int, str]] = pydantic.Field(1, alias="maxOccurs")
-    additional_parameters: Optional[AdditionalProcessIOParameters] = None
+    keywords: list[str] | None = None
+    metadata: list[ProcessMetadata] | None = None
+    min_occurs: Annotated[int, pydantic.Field(alias="minOccurs")] = 1
+    max_occurs: Annotated[int | str | None, pydantic.Field(alias="maxOccurs")] = 1
+    additional_parameters: AdditionalProcessIOParameters | None = None
 
 
 class ProcessSummary(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(use_enum_values=True)
+
     version: str
     id: str
-    title: Optional[Union[Dict[str, str], str]] = None
-    description: Optional[Union[Dict[str, str], str]] = None
-    keywords: Optional[List[str]] = None
-    job_control_options: Optional[List[ProcessJobControlOption]] = pydantic.Field(
-        [ProcessJobControlOption.SYNC_EXECUTE], alias="jobControlOptions"
-    )
-    output_transmission: Optional[List[ProcessOutputTransmissionMode]] = pydantic.Field(
-        [ProcessOutputTransmissionMode.VALUE], alias="outputTransmission"
-    )
-    links: Optional[List[Link]] = None
-
-    class Config:
-        use_enum_values = True
+    title: dict[str, str] | str | None = None
+    description: dict[str, str] | str | None = None
+    keywords: list[str] | None = None
+    job_control_options: Annotated[
+        list[ProcessJobControlOption] | None, pydantic.Field(alias="jobControlOptions")
+    ] = [ProcessJobControlOption.SYNC_EXECUTE]
+    output_transmission: Annotated[
+        list[ProcessOutputTransmissionMode] | None, pydantic.Field(alias="outputTransmission")
+    ] = [ProcessOutputTransmissionMode.VALUE]
+    links: list[Link] | None = None
 
 
 class ProcessDescription(ProcessSummary):
-    inputs: Dict[str, ProcessInput]
-    outputs: Dict[str, ProcessOutput]
-    example: Optional[dict]
+    inputs: dict[str, ProcessInput]
+    outputs: dict[str, ProcessOutput]
+    example: dict | None = None
 
 
 class ExecutionInputBBox(pydantic.BaseModel):
-    bbox: List[float] = pydantic.Field(..., min_items=4, max_items=4)
-    crs: Optional[str] = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+    bbox: Annotated[list[float], pydantic.Field(min_length=4, max_length=4)]
+    crs: str | None = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
 
 
-class ExecutionInputValueNoObjectArray(pydantic.BaseModel):
-    __root__: List[
-        Union[ExecutionInputBBox, int, str, "ExecutionInputValueNoObjectArray"]
+class ExecutionInputValueNoObjectArray(
+    pydantic.RootModel[
+        list[
+            "ExecutionInputBBox" | int | str | "ExecutionInputValueNoObjectArray"
+        ]
     ]
+):
+    pass
 
 
-class ExecutionInputValueNoObject(pydantic.BaseModel):
-    """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
-
-    __root__: Union[
-        ExecutionInputBBox,
-        bool,
+class ExecutionInputValueNoObject(
+    pydantic.RootModel[
+        str,
         float,
         int,
+        bool,
+        ExecutionInputBBox,
         ExecutionInputValueNoObjectArray,
-        str,
     ]
+):
+    """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
 
-    class Config:
-        smart_union = True
+    pass
 
 
 class ExecutionFormat(pydantic.BaseModel):
     """Models the `format.yml` schema defined in OAPIP."""
 
-    media_type: Optional[str] = pydantic.Field(None, alias="mediaType")
-    encoding: Optional[str]
-    schema_: Optional[Union[str, dict]] = pydantic.Field(None, alias="schema")
+    media_type: Annotated[str | None, pydantic.Field(alias="mediaType")] = None
+    encoding: str | None = None
+    schema_: Annotated[str | dict | None, pydantic.Field(alias="schema")] = None
 
 
 class ExecutionQualifiedInputValue(pydantic.BaseModel):
     """Models the `qualifiedInputValue.yml` schema defined in OAPIP."""
 
     value: Union[ExecutionInputValueNoObject, dict]
-    format_: Optional[ExecutionFormat] = None
+    format_: ExecutionFormat | None = None
 
 
 class ExecutionOutput(pydantic.BaseModel):
     """Models the `output.yml` schema defined in OAPIP."""
 
-    format_: Optional[ExecutionFormat] = pydantic.Field(None, alias="format")
-    transmission_mode: Optional[ProcessOutputTransmissionMode] = pydantic.Field(
-        ProcessOutputTransmissionMode.VALUE.value, alias="transmissionMode"
-    )
+    model_config = pydantic.ConfigDict(use_enum_values=True)
 
-    class Config:
-        use_enum_values = True
+    format_: Annotated[ExecutionFormat | None, pydantic.Field(alias="format")] = None
+    transmission_mode: Annotated[
+        ProcessOutputTransmissionMode | None, pydantic.Field(alias="transmissionMode")
+    ] = ProcessOutputTransmissionMode.VALUE.value
 
 
 class ExecutionSubscriber(pydantic.BaseModel):
     """Models the `subscriber.yml` schema defined in OAPIP."""
 
-    success_uri: str = pydantic.Field(..., alias="successUri")
-    in_progress_uri: Optional[str] = pydantic.Field(None, alias="inProgressUri")
-    failed_uri: Optional[str] = pydantic.Field(None, alias="failedUri")
+    success_uri: Annotated[str, pydantic.Field(alias="successUri")]
+    in_progress_uri: Annotated[str | None, pydantic.Field(alias="inProgressUri")] = None
+    failed_uri: Annotated[str | None, pydantic.Field(alias="failedUri")] = None
 
 
 class ExecuteRequest(pydantic.BaseModel):
     """Models the `execute.yml` schema defined in OAPIP."""
 
-    inputs: Optional[
-        Dict[
-            str,
-            Union[
-                ExecutionInputValueNoObject,
-                ExecutionQualifiedInputValue,
-                Link,
-                List[
-                    Union[
-                        ExecutionInputValueNoObject,
-                        ExecutionQualifiedInputValue,
-                        Link,
-                    ]
-                ],
-            ],
-        ]
-    ] = None
-    outputs: Optional[Dict[str, ExecutionOutput]] = None
-    response: Optional[ProcessResponseType] = ProcessResponseType.raw
-    subscriber: Optional[ExecutionSubscriber] = None
+    model_config = pydantic.ConfigDict(use_enum_values=True)
 
-    class Config:
-        use_enum_values = True
+    inputs: dict[
+        str,
+        Union[
+            ExecutionInputValueNoObject,
+            ExecutionQualifiedInputValue,
+            Link,
+            list[
+                Union[
+                    ExecutionInputValueNoObject,
+                    ExecutionQualifiedInputValue,
+                    Link,
+                ]
+            ],
+        ],
+    ] | None = None
+    outputs: dict[str, ExecutionOutput] | None = None
+    response: ProcessResponseType | None = ProcessResponseType.raw
+    subscriber: ExecutionSubscriber | None = None
 
 
 class OutputExecutionResultInternal(pydantic.BaseModel):
@@ -303,32 +289,30 @@ class OutputExecutionResultInternal(pydantic.BaseModel):
     media_type: str
 
 
-class ExecutionDocumentSingleOutput(pydantic.BaseModel):
-    __root__: Union[
-        ExecutionInputValueNoObject,
-        ExecutionQualifiedInputValue,
-        Link,
-    ]
+class ExecutionDocumentSingleOutput(
+    pydantic.RootModel[Union[ExecutionInputValueNoObject, ExecutionQualifiedInputValue, Link]]
+):
+    pass
 
 
-class ExecutionDocumentResult(pydantic.BaseModel):
-    __root__: Dict[str, ExecutionDocumentSingleOutput]
+class ExecutionDocumentResult(pydantic.RootModel[dict[str, ExecutionDocumentSingleOutput]]):
+    pass
 
 
 class JobStatusInfoBase(pydantic.BaseModel):
-    job_id: str = pydantic.Field(..., alias="jobID")
-    process_id: Optional[str] = pydantic.Field(None, alias="processID")
+    job_id: Annotated[str, pydantic.Field(alias="jobID")]
+    process_id: Annotated[str | None, pydantic.Field(alias="processID")] = None
     status: JobStatus
-    message: Optional[str] = None
-    created: Optional[dt.datetime] = None
-    started: Optional[dt.datetime] = None
-    finished: Optional[dt.datetime] = None
-    updated: Optional[dt.datetime] = None
-    progress: Optional[int] = pydantic.Field(None, ge=0, le=100)
+    message: str | None = None
+    created: dt.datetime | None = None
+    started: dt.datetime | None = None
+    finished: dt.datetime | None = None
+    updated: dt.datetime | None = None
+    progress: Annotated[int | None, pydantic.Field(ge=0, le=100)] = None
 
 
 class JobStatusInfoInternal(JobStatusInfoBase):
-    negotiated_execution_mode: Optional[ProcessExecutionMode] = None
-    requested_response_type: Optional[ProcessResponseType] = None
-    requested_outputs: Optional[Dict[str, ExecutionOutput]] = None
-    generated_outputs: Optional[Dict[str, OutputExecutionResultInternal]] = None
+    negotiated_execution_mode: ProcessExecutionMode | None = None
+    requested_response_type: ProcessResponseType | None = None
+    requested_outputs: dict[str, ExecutionOutput] | None = None
+    generated_outputs: dict[str, OutputExecutionResultInternal] | None = None

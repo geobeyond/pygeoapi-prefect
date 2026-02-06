@@ -9,8 +9,8 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pydantic>=1.10.7,<2",
-    "prefect>=2.9.0,<3",
+    "pydantic>=2.0",
+    "prefect>=3.0",
     "click==8.0.0",  # this version is fixed in order to be compatible with upstream pygeoapi
     "pygeoapi",
 ]
