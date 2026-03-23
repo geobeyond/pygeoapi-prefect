@@ -8,7 +8,10 @@ from prefect.server.schemas.states import StateType
 
 
 async def list_flow_runs(
-        states: list[StateType] | None = None, name_like: str | None = None
+        states: list[StateType] | None = None,
+        name_like: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
 ) -> list[FlowRun]:
     """Retrieve existing prefect flow_runs, optionally filtered by state and name"""
     if states is not None:
@@ -26,7 +29,9 @@ async def list_flow_runs(
             flow_run_filter=filters.FlowRunFilter(
                 state=state_filter,
                 name=name_like_filter,
-            )
+            ),
+            limit=limit,
+            offset=offset
         )
     return response
 
@@ -50,6 +55,6 @@ async def get_flow_run(flow_run_name: str) -> tuple[FlowRun, Flow] | None:
 
 
 async def get_flow(flow_id: uuid.UUID) -> Flow:
-    """Retrive prefect flow details."""
+    """Retrieve prefect flow details."""
     async with get_client() as client:
         return await client.read_flow(flow_id)

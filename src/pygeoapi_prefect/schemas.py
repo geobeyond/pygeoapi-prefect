@@ -6,7 +6,11 @@ from typing import Annotated, Any, Union
 
 import pydantic
 
-from pygeoapi.util import JobStatus
+from pygeoapi.util import (
+    JobStatus,
+    RequestedResponse,
+    Subscriber,
+)
 
 
 class Link(pydantic.BaseModel):
@@ -27,14 +31,16 @@ class Link(pydantic.BaseModel):
         return result
 
 
-class ProcessExecutionMode(enum.Enum):
-    sync_execute = "sync-execute"
-    async_execute = "async-execute"
+# this is included in pygeoapi
+# class ProcessExecutionMode(enum.Enum):
+#     sync_execute = "sync-execute"
+#     async_execute = "async-execute"
 
 
-class RequestedProcessExecutionMode(enum.Enum):
-    wait = "wait"
-    respond_async = "respond-async"
+# this is included in pygeoapi
+# class RequestedProcessExecutionMode(enum.Enum):
+#     wait = "wait"
+#     respond_async = "respond-async"
 
 
 class ProcessOutputTransmissionMode(enum.Enum):
@@ -280,8 +286,8 @@ class ExecuteRequest(pydantic.BaseModel):
         ],
     ] | None = None
     outputs: dict[str, ExecutionOutput] | None = None
-    response: ProcessResponseType | None = ProcessResponseType.raw
-    subscriber: ExecutionSubscriber | None = None
+    response: RequestedResponse | None = RequestedResponse.raw
+    subscriber: Subscriber | None = None
 
 
 class OutputExecutionResultInternal(pydantic.BaseModel):

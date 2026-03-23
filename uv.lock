@@ -2090,7 +2090,7 @@ wheels = [
 
 [[package]]
 name = "pygeoapi"
-version = "0.23.dev0"
+version = "0.24.dev0"
 source = { editable = "../../pygeoapi" }
 dependencies = [
     { name = "babel" },
