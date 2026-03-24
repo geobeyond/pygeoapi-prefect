@@ -1,8 +1,11 @@
 import abc
-import dataclasses
 import logging
 from pathlib import Path
-from typing import Callable, Dict
+from typing import (
+    Any,
+    Callable,
+    Protocol,
+)
 
 from prefect import Flow
 from pygeoapi.process.base import BaseProcessor
@@ -12,22 +15,62 @@ from .. import schemas
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
-class PrefectDeployment:
-    name: str
-    queue: str
-    storage_block: str | None = None
-    storage_sub_path: str | None = None
+class PygeoapiPrefectFlowProtocol(Protocol):
+
+    def __call__(
+            self,
+            *args,
+            job_id: str,
+            result_storage_block: str | None,
+            process_description: schemas.ProcessDescription,
+            execution_request: schemas.ExecuteRequest,
+    ) -> schemas.JobStatusInfoInternal:
+        """Protocol that flows must implement in order to be callable from pygeoapi"""
 
 
-class BasePrefectProcessor(BaseProcessor, abc.ABC):
-    deployment_info: PrefectDeployment | None
+class BasePrefectProcessor(abc.ABC):
+    deployment_info: schemas.PrefectDeployment | None
+    process_description: schemas.ProcessDescription | None
+    process_flow: PygeoapiPrefectFlowProtocol
+    result_storage_block: str | None
+
+    def __init__(
+            self,
+            deployment_info: schemas.PrefectDeployment | None = None,
+            result_storage_block: str | None = None,
+    ) -> None:
+        """Instantiate a prefect processor.
+
+        Note that because initialization is solely performed by the pygeoapi
+        process manager, and this protocol caters exclusively to
+        prefect-enabled processors, we are able to specify a custom
+        initialization that takes concrete arguments, rather than the usual
+        dict that pygeoapi provides to vanilla processes.
+
+        Prefect-related processors are not expected to work with any other
+        process managers rather than the
+        `pygeoapi_prefect.manager.PrefectManager` one, as they require
+        a running prefect instance.
+        """
+        self.deployment_info = deployment_info
+        self.result_storage_block = result_storage_block
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return (
+            self.process_description.model_dump(exclude_none=True, by_alias=True)
+            if self.process_description else {}
+        )
+
+
+class OldBasePrefectProcessor(BaseProcessor, abc.ABC):
+    deployment_info: schemas.PrefectDeployment | None
     result_storage_block: str | None
 
     def __init__(self, processor_def: dict):
         super().__init__(processor_def, process_metadata=None)
         if (depl := processor_def.get("prefect", {}).get("deployment")) is not None:
-            self.deployment_info = PrefectDeployment(
+            self.deployment_info = schemas.PrefectDeployment(
                 depl["name"],
                 depl["queue"],
                 storage_block=depl.get("storage_block"),
@@ -39,7 +82,7 @@ class BasePrefectProcessor(BaseProcessor, abc.ABC):
             self.result_storage_block = sb
 
     @property
-    def metadata(self) -> Dict:
+    def metadata(self) -> dict:
         """Compatibility with pygeoapi's BaseProcessor.
 
         Contrary to pygeoapi, which stores process metadata as a plain dictionary,
@@ -53,7 +96,7 @@ class BasePrefectProcessor(BaseProcessor, abc.ABC):
         return self.process_description.dict(exclude_none=True, by_alias=True)
 
     @metadata.setter
-    def metadata(self, metadata: Dict):
+    def metadata(self, metadata: dict):
         """Compatibility with pygeoapi's BaseProcessor.
 
         pygeoapi-prefect does not store processor description as a plain

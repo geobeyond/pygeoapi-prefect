@@ -2,15 +2,27 @@
 
 import datetime as dt
 import enum
-from typing import Annotated, Any, Union
+from typing import (
+    Annotated,
+    Any,
+    Union,
+)
 
 import pydantic
 
 from pygeoapi.util import (
     JobStatus,
+    ProcessExecutionMode,
     RequestedResponse,
     Subscriber,
 )
+
+
+class PrefectDeployment(pydantic.BaseModel):
+    name: str
+    queue: str
+    storage_block: str | None = None
+    storage_sub_path: str | None = None
 
 
 class Link(pydantic.BaseModel):
@@ -31,35 +43,23 @@ class Link(pydantic.BaseModel):
         return result
 
 
-# this is included in pygeoapi
-# class ProcessExecutionMode(enum.Enum):
-#     sync_execute = "sync-execute"
-#     async_execute = "async-execute"
-
-
-# this is included in pygeoapi
-# class RequestedProcessExecutionMode(enum.Enum):
-#     wait = "wait"
-#     respond_async = "respond-async"
-
-
-class ProcessOutputTransmissionMode(enum.Enum):
+class ProcessOutputTransmissionMode(str, enum.Enum):
     VALUE = "value"
     REFERENCE = "reference"
 
 
-class ProcessResponseType(enum.Enum):
+class ProcessResponseType(str, enum.Enum):
     document = "document"
     raw = "raw"
 
 
-class ProcessJobControlOption(enum.Enum):
+class ProcessJobControlOption(str, enum.Enum):
     SYNC_EXECUTE = "sync-execute"
     ASYNC_EXECUTE = "async-execute"
     DISMISS = "dismiss"
 
 
-class ProcessIOType(enum.Enum):
+class ProcessIOType(str, enum.Enum):
     ARRAY = "array"
     BOOLEAN = "boolean"
     INTEGER = "integer"
@@ -110,53 +110,54 @@ class ProcessIOFormat(enum.Enum):
 
 # this is a 'pydantification' of the schema.yml fragment, as shown
 # on the OAPI - Processes spec
-class ProcessIOSchema(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(use_enum_values=True)
-
-    title: str | None = None
-    multiple_of: Annotated[float | None, pydantic.Field(alias="multipleOf")] = None
-    maximum: float | None = None
-    exclusive_maximum: Annotated[bool | None, pydantic.Field(alias="exclusiveMaximum")] = False
-    minimum: float | None = None
-    exclusive_minimum: Annotated[bool | None, pydantic.Field(alias="exclusiveMinimum")] = False
-    max_length: Annotated[int | None, pydantic.Field(ge=0, alias="maxLength")] = None
-    min_length: Annotated[int, pydantic.Field(ge=0, alias="minLength")] = 0
-    pattern: str | None = None
-    max_items: Annotated[int | None, pydantic.Field(ge=0, alias="maxItems")] = None
-    min_items: Annotated[int, pydantic.Field(ge=0, alias="minItems")] = 0
-    unique_items: Annotated[bool | None, pydantic.Field(alias="uniqueItems")] = False
-    max_properties: Annotated[int | None, pydantic.Field(ge=0, alias="maxProperties")] = None
-    min_properties: Annotated[int, pydantic.Field(ge=0, alias="minProperties")] = 0
-    required: list[str] | None = None
-    enum: list[Any] | None = None
-    type_: Annotated[ProcessIOType | None, pydantic.Field(alias="type")] = None
-    not_: Annotated["ProcessIOSchema | None", pydantic.Field(alias="not")] = None
-    allOf: list["ProcessIOSchema"] | None = None
-    oneOf: list["ProcessIOSchema"] | None = None
-    anyOf: list["ProcessIOSchema"] | None = None
-    items: list["ProcessIOSchema"] | None = None
-    properties: "ProcessIOSchema | None" = None
-    additional_properties: Annotated[
-        bool | "ProcessIOSchema" | None,
-        pydantic.Field(alias="additionalProperties")
-    ] = True
-    description: str | None = None
-    format_: Annotated[ProcessIOFormat | None, pydantic.Field(alias="format")] = None
-    default: dict | None = None
-    nullable: bool | None = False
-    read_only: Annotated[bool | None, pydantic.Field(alias="readOnly")] = False
-    write_only: Annotated[bool | None, pydantic.Field(alias="writeOnly")] = False
-    example: dict | None = None
-    deprecated: bool | None = False
-    content_media_type: Annotated[str | None, pydantic.Field(alias="contentMediaType")] = None
-    content_encoding: Annotated[str | None, pydantic.Field(alias="contentEncoding")] = None
-    content_schema: Annotated[str | None, pydantic.Field(alias="contentSchema")] = None
+# class ProcessIOSchema(pydantic.BaseModel):
+#     model_config = pydantic.ConfigDict(use_enum_values=True)
+#
+#     title: str | None = None
+#     multiple_of: Annotated[float | None, pydantic.Field(alias="multipleOf")] = None
+#     maximum: float | None = None
+#     exclusive_maximum: Annotated[bool | None, pydantic.Field(alias="exclusiveMaximum")] = False
+#     minimum: float | None = None
+#     exclusive_minimum: Annotated[bool | None, pydantic.Field(alias="exclusiveMinimum")] = False
+#     max_length: Annotated[int | None, pydantic.Field(ge=0, alias="maxLength")] = None
+#     min_length: Annotated[int, pydantic.Field(ge=0, alias="minLength")] = 0
+#     pattern: str | None = None
+#     max_items: Annotated[int | None, pydantic.Field(ge=0, alias="maxItems")] = None
+#     min_items: Annotated[int, pydantic.Field(ge=0, alias="minItems")] = 0
+#     unique_items: Annotated[bool | None, pydantic.Field(alias="uniqueItems")] = False
+#     max_properties: Annotated[int | None, pydantic.Field(ge=0, alias="maxProperties")] = None
+#     min_properties: Annotated[int, pydantic.Field(ge=0, alias="minProperties")] = 0
+#     required: list[str] | None = None
+#     enum: list[Any] | None = None
+#     type_: Annotated[ProcessIOType | None, pydantic.Field(alias="type")] = None
+#     not_: Annotated["ProcessIOSchema | None", pydantic.Field(alias="not")] = None
+#     allOf: list["ProcessIOSchema"] | None = None
+#     oneOf: list["ProcessIOSchema"] | None = None
+#     anyOf: list["ProcessIOSchema"] | None = None
+#     items: list["ProcessIOSchema"] | None = None
+#     properties: "ProcessIOSchema | None" = None
+#     additional_properties: Annotated[
+#         bool | "ProcessIOSchema" | None,
+#         pydantic.Field(alias="additionalProperties")
+#     ] = True
+#     description: str | None = None
+#     format_: Annotated[ProcessIOFormat | None, pydantic.Field(alias="format")] = None
+#     default: dict | None = None
+#     nullable: bool | None = False
+#     read_only: Annotated[bool | None, pydantic.Field(alias="readOnly")] = False
+#     write_only: Annotated[bool | None, pydantic.Field(alias="writeOnly")] = False
+#     example: dict | None = None
+#     deprecated: bool | None = False
+#     content_media_type: Annotated[str | None, pydantic.Field(alias="contentMediaType")] = None
+#     content_encoding: Annotated[str | None, pydantic.Field(alias="contentEncoding")] = None
+#     content_schema: Annotated[str | None, pydantic.Field(alias="contentSchema")] = None
 
 
 class ProcessOutput(pydantic.BaseModel):
     title: str | None = None
     description: str | None = None
-    schema_: Annotated[ProcessIOSchema, pydantic.Field(alias="schema")]
+    # schema_: Annotated[ProcessIOSchema, pydantic.Field(alias="schema")]
+    schema_: Annotated[dict[str, Any], pydantic.Field(alias="schema")]
 
 
 class ProcessMetadata(pydantic.BaseModel):
@@ -187,10 +188,12 @@ class ProcessSummary(pydantic.BaseModel):
     description: dict[str, str] | str | None = None
     keywords: list[str] | None = None
     job_control_options: Annotated[
-        list[ProcessJobControlOption] | None, pydantic.Field(alias="jobControlOptions")
+        list[ProcessJobControlOption] | None,
+        pydantic.Field(alias="jobControlOptions")
     ] = [ProcessJobControlOption.SYNC_EXECUTE]
     output_transmission: Annotated[
-        list[ProcessOutputTransmissionMode] | None, pydantic.Field(alias="outputTransmission")
+        list[ProcessOutputTransmissionMode] | None,
+        pydantic.Field(alias="outputTransmission")
     ] = [ProcessOutputTransmissionMode.VALUE]
     links: list[Link] | None = None
 
@@ -201,34 +204,34 @@ class ProcessDescription(ProcessSummary):
     example: dict | None = None
 
 
-class ExecutionInputBBox(pydantic.BaseModel):
-    bbox: Annotated[list[float], pydantic.Field(min_length=4, max_length=4)]
-    crs: str | None = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
-
-
-class ExecutionInputValueNoObjectArray(
-    pydantic.RootModel[
-        list[
-            "ExecutionInputBBox" | int | str | "ExecutionInputValueNoObjectArray"
-        ]
-    ]
-):
-    pass
-
-
-class ExecutionInputValueNoObject(
-    pydantic.RootModel[
-        str,
-        float,
-        int,
-        bool,
-        ExecutionInputBBox,
-        ExecutionInputValueNoObjectArray,
-    ]
-):
-    """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
-
-    pass
+# class ExecutionInputBBox(pydantic.BaseModel):
+#     bbox: Annotated[list[float], pydantic.Field(min_length=4, max_length=4)]
+#     crs: str | None = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+#
+#
+# class ExecutionInputValueNoObjectArray(
+#     pydantic.RootModel[
+#         list[
+#             "ExecutionInputBBox" | int | str | "ExecutionInputValueNoObjectArray"
+#         ]
+#     ]
+# ):
+#     pass
+#
+#
+# class ExecutionInputValueNoObject(
+#     pydantic.RootModel[
+#         str,
+#         float,
+#         int,
+#         bool,
+#         ExecutionInputBBox,
+#         ExecutionInputValueNoObjectArray,
+#     ]
+# ):
+#     """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
+#
+#     pass
 
 
 class ExecutionFormat(pydantic.BaseModel):
@@ -237,13 +240,13 @@ class ExecutionFormat(pydantic.BaseModel):
     media_type: Annotated[str | None, pydantic.Field(alias="mediaType")] = None
     encoding: str | None = None
     schema_: Annotated[str | dict | None, pydantic.Field(alias="schema")] = None
-
-
-class ExecutionQualifiedInputValue(pydantic.BaseModel):
-    """Models the `qualifiedInputValue.yml` schema defined in OAPIP."""
-
-    value: Union[ExecutionInputValueNoObject, dict]
-    format_: ExecutionFormat | None = None
+#
+#
+# class ExecutionQualifiedInputValue(pydantic.BaseModel):
+#     """Models the `qualifiedInputValue.yml` schema defined in OAPIP."""
+#
+#     value: Union[ExecutionInputValueNoObject, dict]
+#     format_: ExecutionFormat | None = None
 
 
 class ExecutionOutput(pydantic.BaseModel):
@@ -269,22 +272,22 @@ class ExecuteRequest(pydantic.BaseModel):
     """Models the `execute.yml` schema defined in OAPIP."""
 
     model_config = pydantic.ConfigDict(use_enum_values=True)
-
-    inputs: dict[
-        str,
-        Union[
-            ExecutionInputValueNoObject,
-            ExecutionQualifiedInputValue,
-            Link,
-            list[
-                Union[
-                    ExecutionInputValueNoObject,
-                    ExecutionQualifiedInputValue,
-                    Link,
-                ]
-            ],
-        ],
-    ] | None = None
+    inputs: dict[str, Any] | None = None
+    # inputs: dict[
+    #     str,
+    #     Union[
+    #         ExecutionInputValueNoObject,
+    #         ExecutionQualifiedInputValue,
+    #         Link,
+    #         list[
+    #             Union[
+    #                 ExecutionInputValueNoObject,
+    #                 ExecutionQualifiedInputValue,
+    #                 Link,
+    #             ]
+    #         ],
+    #     ],
+    # ] | None = None
     outputs: dict[str, ExecutionOutput] | None = None
     response: RequestedResponse | None = RequestedResponse.raw
     subscriber: Subscriber | None = None
@@ -295,14 +298,14 @@ class OutputExecutionResultInternal(pydantic.BaseModel):
     media_type: str
 
 
-class ExecutionDocumentSingleOutput(
-    pydantic.RootModel[Union[ExecutionInputValueNoObject, ExecutionQualifiedInputValue, Link]]
-):
-    pass
-
-
-class ExecutionDocumentResult(pydantic.RootModel[dict[str, ExecutionDocumentSingleOutput]]):
-    pass
+# class ExecutionDocumentSingleOutput(
+#     pydantic.RootModel[Union[ExecutionInputValueNoObject, ExecutionQualifiedInputValue, Link]]
+# ):
+#     pass
+#
+#
+# class ExecutionDocumentResult(pydantic.RootModel[dict[str, ExecutionDocumentSingleOutput]]):
+#     pass
 
 
 class JobStatusInfoBase(pydantic.BaseModel):
@@ -322,3 +325,8 @@ class JobStatusInfoInternal(JobStatusInfoBase):
     requested_response_type: ProcessResponseType | None = None
     requested_outputs: dict[str, ExecutionOutput] | None = None
     generated_outputs: dict[str, OutputExecutionResultInternal] | None = None
+
+
+class JobList(pydantic.BaseModel):
+    jobs: list[JobStatusInfoInternal]
+    number_matched: Annotated[int, pydantic.Field(alias="numberMatched")]

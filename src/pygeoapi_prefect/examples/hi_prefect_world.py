@@ -1,32 +1,40 @@
 """Example pygeoapi process"""
 
 from prefect import (
+    Flow,
     flow,
     get_run_logger,
     task,
 )
 from prefect.blocks.core import Block
 from prefect.filesystems import LocalFileSystem
-from pygeoapi.process import exceptions
-from prefect.task_runners import SequentialTaskRunner
+from pygeoapi.process.base import ProcessorExecuteError
+from pygeoapi.util import JobStatus
 
-# don't perform relative imports because otherwise prefect deployment won't
+# don't perform relative imports because otherwise prefect deployments won't
 # work properly
-from pygeoapi_prefect import schemas
+from pygeoapi_prefect.schemas import (
+    ExecuteRequest,
+    JobStatusInfoInternal,
+    OutputExecutionResultInternal,
+    ProcessDescription,
+    ProcessInput,
+    ProcessJobControlOption,
+    ProcessOutput,
+)
 from pygeoapi_prefect.process.base import BasePrefectProcessor
 
 
 @flow(
     persist_result=True,
     log_prints=True,
-    task_runner=SequentialTaskRunner(),
 )
 def hi_prefect_world(
     job_id: str,
     result_storage_block: str | None,
-    process_description: schemas.ProcessDescription,
-    execution_request: schemas.ExecuteRequest,
-) -> schemas.JobStatusInfoInternal:
+    process_description: ProcessDescription,
+    execution_request: ExecuteRequest,
+) -> JobStatusInfoInternal:
     """Echo back a greeting message.
 
     Execution follows this pattern:
@@ -41,7 +49,7 @@ def hi_prefect_world(
     try:
         name = execution_request.inputs["name"].__root__
     except KeyError:
-        raise exceptions.MissingJobParameterError("Cannot process without a name")
+        raise ProcessorExecuteError("Cannot process without a name")
     else:
         msg = execution_request.inputs.get("message")
         message = msg.__root__ if msg is not None else ""
@@ -78,12 +86,12 @@ def store_result(contents: str, job_id: str, storage_block: str | None) -> str:
 def generate_status_info(
     job_id: str, process_id: str, result_path: str, result_media_type: str
 ):
-    return schemas.JobStatusInfoInternal(
+    return JobStatusInfoInternal(
         jobID=job_id,
         processID=process_id,
-        status=schemas.JobStatus.successful,
+        status=JobStatus.successful,
         generated_outputs={
-            "result": schemas.OutputExecutionResultInternal(
+            "result": OutputExecutionResultInternal(
                 location=result_path,
                 media_type=result_media_type,
             )
@@ -94,35 +102,35 @@ def generate_status_info(
 class HiPrefectWorldProcessor(BasePrefectProcessor):
     process_flow = hi_prefect_world
 
-    process_description = schemas.ProcessDescription(
+    process_description = ProcessDescription(
         id="hi-prefect-world",  # id MUST match key given in pygeoapi config
         version="0.0.1",
         title="Hi prefect world Processor",
         description="An example processor that is powered by prefect",
         jobControlOptions=[
-            schemas.ProcessJobControlOption.SYNC_EXECUTE,
-            schemas.ProcessJobControlOption.ASYNC_EXECUTE,
+            ProcessJobControlOption.SYNC_EXECUTE,
+            ProcessJobControlOption.ASYNC_EXECUTE,
         ],
         inputs={
-            "name": schemas.ProcessInput(
+            "name": ProcessInput(
                 title="Name",
                 description="Some name you think is cool. It will be echoed back.",
-                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING),
+                schema={"type": "string"},
                 keywords=["cool-name"],
             ),
-            "message": schemas.ProcessInput(
+            "message": ProcessInput(
                 title="Message",
                 description="An optional additional message to be echoed to the world",
-                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING),
+                schema={"type": "string"},
                 minOccurs=0,
             ),
         },
         outputs={
-            "result": schemas.ProcessOutput(
-                schema=schemas.ProcessIOSchema(
-                    type=schemas.ProcessIOType.STRING,
-                    contentMediaType="text/plain",
-                )
+            "result": ProcessOutput(
+                schema={
+                    "type": "string",
+                    "contentMediaType": "text/plain",
+                },
             )
         },
         keywords=[

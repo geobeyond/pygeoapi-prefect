@@ -39,7 +39,7 @@ As such, in order to use prefect-powered processes you will need to:
 
 !!! note
 
-    We recommend getting having the [prefect docs](https://docs.prefect.io/latest/) at hand when defining new flows.
+    We recommend having the [prefect docs](https://docs.prefect.io/latest/) at hand when defining new flows.
 
 
 pygeoapi-prefect is able to use regular prefect flows. However, they must meet the following requirements:
@@ -158,11 +158,11 @@ A simple example, meant to work together with [the prefect flow defined earlier]
     Inside your custom processor modules be sure to use absolute imports. Otherwise the prefect deployment may not be
     able to find all of your code's dependencies.
 
-
 ```python
 from prefect import flow
 from pygeoapi.models import processes as schemas
-from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.process.base import OldBasePrefectProcessor
+
 
 @flow(persist_result=True)
 def simple_flow(
@@ -174,7 +174,7 @@ def simple_flow(
     ...  # omitted for brevity, see above for the full implementation
 
 
-class SimpleFlowProcessor(BasePrefectProcessor):
+class SimpleFlowProcessor(OldBasePrefectProcessor):
     process_flow = simple_flow
     process_description = schemas.ProcessDescription(
         id="simple-flow",  # id MUST match key given in pygeoapi config
@@ -187,17 +187,20 @@ class SimpleFlowProcessor(BasePrefectProcessor):
         inputs={
             "name": schemas.ProcessInput(
                 title="Name",
-                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING)
+                schema={"type": "string"},
             ),
             "message": schemas.ProcessInput(
                 title="Message",
-                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING),
+                schema={"type": "string"},
                 minOccurs=0
             ),
         },
         outputs={
             "result": schemas.ProcessOutput(
-                schema=schemas.ProcessIOSchema(type=schemas.ProcessIOType.STRING, contentMediaType="text/plain")
+                schema={
+                    "type": "string",
+                    "contentMediaType": "text/plain"
+                },
             )
         },
     )

@@ -22,13 +22,12 @@ from prefect.server.schemas.core import Flow
 from prefect.server.schemas.states import StateType
 from prefect.task_runners import ConcurrentTaskRunner
 
-from pygeoapi.process import exceptions
 from pygeoapi.process.base import (
     BaseProcessor,
+    JobNotFoundError,
     ProcessorExecuteError,
-    UnknownProcessError
+    UnknownProcessError,
 )
-from pygeoapi.process.manager.base import BaseManager
 from pygeoapi.plugin import load_plugin
 from pygeoapi.util import (
     JobStatus,
@@ -38,7 +37,7 @@ from pygeoapi.util import (
     Subscriber,
 )
 
-from .process.base import BasePrefectProcessor
+from .process.base import OldBasePrefectProcessor
 from . import prefect_client
 from . import schemas
 
@@ -111,7 +110,7 @@ class PygeoapiProcessManagerProtocol(Protocol):
             status: JobStatus | None = None,
             limit: int | None = None,
             offset: int | None = None
-    ) -> dict[JobId, dict]:
+    ) -> dict[str, Any]:
         """Get process-related jobs"""
 
     def get_job(self, job_id: JobId) -> dict:
@@ -204,12 +203,13 @@ class PrefectManager:
         date_time: str | None = None,
         min_duration_seconds: int | None = None,
         max_duration_seconds: int | None = None,
-    ) -> list[schemas.JobStatusInfoInternal]:
+    ) -> dict[str, Any]:
         """Get a list of jobs, optionally filtered by relevant parameters.
 
         Job list filters are not implemented in pygeoapi yet though, so for
         the moment it is not possible to use them for filtering jobs.
         """
+        logger.debug(f"get_jobs called with {locals()=}")
         if status:
             prefect_states = [
                 k for k, v in self.prefect_state_map.items() if status == v]
@@ -244,7 +244,10 @@ class PrefectManager:
             jobs.append(
                 self._flow_run_to_job_status(flow_run, seen_flows[flow_run.flow_id])
             )
-        return jobs
+        return schemas.JobList(
+            jobs=jobs,
+            numberMatched=0
+        ).model_dump(by_alias=True)
 
     def get_job(self, job_id: str) -> schemas.JobStatusInfoInternal:
         """Get job details."""
@@ -258,7 +261,7 @@ class PrefectManager:
             flow_run_details = None
 
         if flow_run_details is None:
-            raise exceptions.JobNotFoundError()
+            raise JobNotFoundError()
         else:
             flow_run, prefect_flow = flow_run_details
             return self._flow_run_to_job_status(flow_run, prefect_flow)
@@ -272,7 +275,7 @@ class PrefectManager:
     def get_processor(self, process_id: str) -> PygeoapiProcessorProtocol:
         if (processor_conf := self._processor_configurations.get(process_id)) is None:
             raise UnknownProcessError(f"processor with id {process_id!r} is not known")
-        return load_plugin("process", processor_conf)
+        return load_plugin("process", processor_conf["processor"])
 
     def execute_process(
             self,
@@ -297,6 +300,7 @@ class PrefectManager:
         Finally, it receives whatever results are generated and converts
         back to the data structure expected by pygeoapi.
         """
+        logger.debug(f"inside execute_process {locals()=}")
         execution_result = self._execute(
             process_id=process_id,
             execution_request=schemas.ExecuteRequest(
@@ -343,7 +347,7 @@ class PrefectManager:
         chosen_mode, additional_headers = self._select_execution_mode(
             requested_execution_mode, processor)
         job_id = JobId(str(uuid.uuid4()))
-        if isinstance(processor, BasePrefectProcessor):
+        if isinstance(processor, OldBasePrefectProcessor):
             internal_job_status = self._execute_prefect_processor(
                 job_id, processor, chosen_mode, execution_request
             )
@@ -369,15 +373,15 @@ class PrefectManager:
     def _execute_prefect_processor(
             self,
             job_id: JobId,
-            processor: BasePrefectProcessor,
+            processor: OldBasePrefectProcessor,
             chosen_mode: ProcessExecutionMode,
             execution_request: schemas.ExecuteRequest,
     ) -> schemas.JobStatusInfoInternal:
-        """Execute custom prefect processor.
+        """Execute a custom prefect processor.
 
-        Execution is performed by one of three ways:
+        Execution is performed in one of three ways:
 
-        - if there is a deployment for the process, then run wherever the
+        - If there is a deployment for the process, then run wherever the
           deployment is housed. Depending on the chosen execution mode, runs
           either:
             - asynchronously
@@ -449,10 +453,10 @@ class PrefectManager:
         manager's behavior of saving generated outputs to disk.
         """
 
-        execution_parameters = execution_request.dict(by_alias=True, exclude_none=True)
+        execution_parameters = execution_request.model_dump(
+            by_alias=True, exclude_none=True)
         input_parameters = execution_parameters.get("inputs", {})
         logger.warning(f"{execution_parameters=}")
-        logger.warning(f"{input_parameters=}")
 
         @flow(
             name=processor.metadata["id"],
@@ -461,7 +465,6 @@ class PrefectManager:
             persist_result=True,
             log_prints=True,
             validate_parameters=True,
-            task_runner=ConcurrentTaskRunner(),  # this should be configurable
             retries=0,  # this should be configurable
             retry_delay_seconds=0,  # this should be configurable
             timeout_seconds=None,  # this should be configurable
@@ -570,7 +573,7 @@ class PrefectManager:
     ) -> bytes:
         """Get output data as bytes."""
         processor = self.get_processor(process_id)
-        if isinstance(processor, BasePrefectProcessor):
+        if isinstance(processor, OldBasePrefectProcessor):
             if (sb := processor.result_storage_block) is not None:
                 file_system = Block.load(sb)
                 result = file_system.read_path(generated_output.location)

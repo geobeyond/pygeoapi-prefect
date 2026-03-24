@@ -6,7 +6,7 @@
     execution ones.
 
     This means that it is possible to use a hosted prefect server
-    (_i.e._ [prefect cloud](https://app.prefect.cloud/))
+    (_i.e._ [prefect cloud](https://app.prefect.cloud/) or a self-hosted server)
     for the orchestration and use your own infrastructure (local, cloud, docker, k8s) for execution.
     This ensures your data stays private.
 
