@@ -17,12 +17,12 @@ from pygeoapi_prefect.schemas import (
     ExecuteRequest,
     JobStatusInfoInternal,
     OutputExecutionResultInternal,
-    ProcessDescription,
+    InternalProcessDescription,
     ProcessInput,
     ProcessJobControlOption,
     ProcessOutput,
 )
-from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.process import BasePrefectProcessor
 
 
 @flow(
@@ -32,7 +32,7 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 def hi_prefect_world(
     job_id: str,
     result_storage_block: str | None,
-    process_description: ProcessDescription,
+    process_description: InternalProcessDescription,
     execution_request: ExecuteRequest,
 ) -> JobStatusInfoInternal:
     """Echo back a greeting message.
@@ -102,15 +102,10 @@ def generate_status_info(
 class HiPrefectWorldProcessor(BasePrefectProcessor):
     process_flow = hi_prefect_world
 
-    process_description = ProcessDescription(
-        id="hi-prefect-world",  # id MUST match key given in pygeoapi config
+    process_description = InternalProcessDescription(
         version="0.0.1",
         title="Hi prefect world Processor",
         description="An example processor that is powered by prefect",
-        jobControlOptions=[
-            ProcessJobControlOption.SYNC_EXECUTE,
-            ProcessJobControlOption.ASYNC_EXECUTE,
-        ],
         inputs={
             "name": ProcessInput(
                 title="Name",

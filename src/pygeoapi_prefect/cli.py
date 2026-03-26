@@ -8,7 +8,7 @@ from pygeoapi.process.manager import get_manager
 from pygeoapi.process import exceptions
 from pygeoapi.util import yaml_load
 
-from .process.base import OldBasePrefectProcessor
+from .process import BasePrefectProcessor
 
 
 @click.group(name="prefect")
@@ -76,7 +76,7 @@ def deploy_process(
     except exceptions.UnknownProcessError as err:
         raise click.BadParameter(f"Process {process_id!r} not found") from err
     else:
-        if isinstance(processor, OldBasePrefectProcessor):
+        if isinstance(processor, BasePrefectProcessor):
             if processor.deployment_info is not None:
                 print(f"Deploying process {process_id!r} with prefect...")
                 if (sb := processor.deployment_info.storage_block) is not None:

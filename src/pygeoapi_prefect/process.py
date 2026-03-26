@@ -10,7 +10,7 @@ from typing import (
 from prefect import Flow
 from pygeoapi.process.base import BaseProcessor
 
-from .. import schemas
+from . import schemas
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class PygeoapiPrefectFlowProtocol(Protocol):
             *args,
             job_id: str,
             result_storage_block: str | None,
-            process_description: schemas.ProcessDescription,
+            process_description: schemas.InternalProcessDescription,
             execution_request: schemas.ExecuteRequest,
     ) -> schemas.JobStatusInfoInternal:
         """Protocol that flows must implement in order to be callable from pygeoapi"""
@@ -30,12 +30,14 @@ class PygeoapiPrefectFlowProtocol(Protocol):
 
 class BasePrefectProcessor(abc.ABC):
     deployment_info: schemas.PrefectDeployment | None
-    process_description: schemas.ProcessDescription | None
+    process_description: schemas.InternalProcessDescription | None
     process_flow: PygeoapiPrefectFlowProtocol
+    pygeoapi_resource_id: str
     result_storage_block: str | None
 
     def __init__(
             self,
+            pygeoapi_resource_id: str,
             deployment_info: schemas.PrefectDeployment | None = None,
             result_storage_block: str | None = None,
     ) -> None:
@@ -52,15 +54,28 @@ class BasePrefectProcessor(abc.ABC):
         `pygeoapi_prefect.manager.PrefectManager` one, as they require
         a running prefect instance.
         """
+        self.pygeoapi_resource_id = pygeoapi_resource_id
         self.deployment_info = deployment_info
         self.result_storage_block = result_storage_block
 
     @property
     def metadata(self) -> dict[str, Any]:
-        return (
-            self.process_description.model_dump(exclude_none=True, by_alias=True)
-            if self.process_description else {}
-        )
+        return {
+            "id": self.pygeoapi_resource_id,
+            **self.process_description.model_dump(
+                exclude_none=True, by_alias=True)
+        }
+
+    @property
+    def name(self) -> str:
+        return ".".join((self.__class__.__module__, self.__class__.__qualname__))
+
+    @property
+    def supports_outputs(self) -> bool:
+        return len(self.process_description.outputs) > 0
+
+    def execute(self, data: dict, outputs: dict | None = None) -> tuple[str, Any]:
+        pass
 
 
 class OldBasePrefectProcessor(BaseProcessor, abc.ABC):
@@ -113,7 +128,7 @@ class OldBasePrefectProcessor(BaseProcessor, abc.ABC):
 
     @property
     @abc.abstractmethod
-    def process_description(self) -> schemas.ProcessDescription:
+    def process_description(self) -> schemas.InternalProcessDescription:
         """Return process-related description.
 
         Note that derived classes are free to implement this as either a

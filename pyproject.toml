@@ -11,8 +11,9 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
     "prefect>=3.0",
-    "click==8.0.0",  # this version is fixed in order to be compatible with upstream pygeoapi
+    "click==8.0.0", # this version is fixed in order to be compatible with upstream pygeoapi
     "pygeoapi",
+    "jsonschema[format]>=4.26.0",
 ]
 
 [dependency-groups]

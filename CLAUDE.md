@@ -62,13 +62,14 @@ uv run pygeoapi openapi generate example-config.yml > example-openapi.yml
 ### Flow Function Signature
 
 Custom Prefect processors must implement a flow function with this signature:
+
 ```python
 @flow(persist_result=True, ...)
 def process_flow(
-    job_id: str,
-    result_storage_block: str | None,
-    process_description: schemas.ProcessDescription,
-    execution_request: schemas.ExecuteRequest
+        job_id: str,
+        result_storage_block: str | None,
+        process_description: schemas.InternalProcessDescription,
+        execution_request: schemas.ExecuteRequest
 ) -> schemas.JobStatusInfoInternal:
 ```
 

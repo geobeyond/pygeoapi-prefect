@@ -77,60 +77,60 @@ from pygeoapi.process import exceptions
 def simple_flow(
         job_id: str,
         result_storage_block: str | None,
-        process_description: schemas.ProcessDescription,
+        process_description: schemas.InternalProcessDescription,
         execution_request: schemas.ExecuteRequest
 ) -> schemas.JobStatusInfoInternal:
-  """This is a simple prefect flow.
+    """This is a simple prefect flow.
 
-  It complies with pygeoapi-prefect's requirements, namely:
+    It complies with pygeoapi-prefect's requirements, namely:
 
-  - The @flow decorator includes `persist_results=True`
-  - Accepts the required input parameters (job_id, result_storage_block,
-    process_description, execution_request)
-  - Stores outputs using prefect block
-  - Returns a status_info
-  """
-  logger = get_run_logger()
-  logger.debug("Starting execution...")
+    - The @flow decorator includes `persist_results=True`
+    - Accepts the required input parameters (job_id, result_storage_block,
+      process_description, execution_request)
+    - Stores outputs using prefect block
+    - Returns a status_info
+    """
+    logger = get_run_logger()
+    logger.debug("Starting execution...")
 
-  # 1. retrieve inputs
-  # 1.1. some may be mandatory
-  try:
-    name = execution_request.inputs["name"].__root__
-  except KeyError:
-    raise exceptions.MissingJobParameterError("Cannot process without a name")
-  else:
-    # 1.2. others may be optional
-    msg = execution_request.inputs.get("message")
-    message = msg.__root__ if msg is not None else ""
-
-    # 2. determine where results will be stored
-    if result_storage_block is not None:
-      storage = Block.load(result_storage_block)
+    # 1. retrieve inputs
+    # 1.1. some may be mandatory
+    try:
+        name = execution_request.inputs["name"].__root__
+    except KeyError:
+        raise exceptions.MissingJobParameterError("Cannot process without a name")
     else:
-      storage = LocalFileSystem()
+        # 1.2. others may be optional
+        msg = execution_request.inputs.get("message")
+        message = msg.__root__ if msg is not None else ""
 
-    # 3. Get to work! - Perform the generation of outputs
-    result_value = f"Hello {name}! {message}".strip()
+        # 2. determine where results will be stored
+        if result_storage_block is not None:
+            storage = Block.load(result_storage_block)
+        else:
+            storage = LocalFileSystem()
 
-    # 4. Store the generated outputs using a prefect block
-    result_path = f"{job_id}/output-result.txt"
-    storage.write_path(result_path, result_value.encode("utf-8"))
+        # 3. Get to work! - Perform the generation of outputs
+        result_value = f"Hello {name}! {message}".strip()
 
-    # 5. Return a status info object
-    return schemas.JobStatusInfoInternal(
-      jobID=job_id,
-      processID=process_description.id,
-      status=schemas.JobStatus.successful,
-      generated_outputs={
-        "result": schemas.OutputExecutionResultInternal(
-          location=f"{storage.basepath}/{result_path}",
-          media_type=(
-            process_description.outputs["result"].schema_.content_media_type
-          ),
+        # 4. Store the generated outputs using a prefect block
+        result_path = f"{job_id}/output-result.txt"
+        storage.write_path(result_path, result_value.encode("utf-8"))
+
+        # 5. Return a status info object
+        return schemas.JobStatusInfoInternal(
+            jobID=job_id,
+            processID=process_description.id,
+            status=schemas.JobStatus.successful,
+            generated_outputs={
+                "result": schemas.OutputExecutionResultInternal(
+                    location=f"{storage.basepath}/{result_path}",
+                    media_type=(
+                        process_description.outputs["result"].schema_.content_media_type
+                    ),
+                )
+            },
         )
-      },
-    )
 ```
 
 
@@ -161,14 +161,14 @@ A simple example, meant to work together with [the prefect flow defined earlier]
 ```python
 from prefect import flow
 from pygeoapi.models import processes as schemas
-from pygeoapi_prefect.process.base import OldBasePrefectProcessor
+from pygeoapi_prefect.process.process import OldBasePrefectProcessor
 
 
 @flow(persist_result=True)
 def simple_flow(
         job_id: str,
         result_storage_block: str | None,
-        process_description: schemas.ProcessDescription,
+        process_description: schemas.InternalProcessDescription,
         execution_request: schemas.ExecuteRequest
 ) -> schemas.JobStatusInfoInternal:
     ...  # omitted for brevity, see above for the full implementation
@@ -176,7 +176,7 @@ def simple_flow(
 
 class SimpleFlowProcessor(OldBasePrefectProcessor):
     process_flow = simple_flow
-    process_description = schemas.ProcessDescription(
+    process_description = schemas.InternalProcessDescription(
         id="simple-flow",  # id MUST match key given in pygeoapi config
         version="0.0.1",
         title="Simple flow Processor",

@@ -14,13 +14,13 @@ from pygeoapi.util import JobStatus
 from pygeoapi_prefect.schemas import (
     ExecuteRequest,
     JobStatusInfoInternal,
-    ProcessDescription,
+    InternalProcessDescription,
     ProcessInput,
     ProcessJobControlOption,
     ProcessOutput,
     OutputExecutionResultInternal,
 )
-from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.process import BasePrefectProcessor
 
 
 # When defining a prefect flow that will be deployed by prefect to some
@@ -33,7 +33,7 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 def simple_flow(
     job_id: str,
     result_storage_block: str | None,
-    process_description: ProcessDescription,
+    process_description: InternalProcessDescription,
     execution_request: ExecuteRequest,
 ) -> JobStatusInfoInternal:
     """Echo back a greeting message.
@@ -75,17 +75,12 @@ def simple_flow(
 class SimpleFlowProcessor(BasePrefectProcessor):
     process_flow = simple_flow
 
-    process_description = ProcessDescription(
-        id="simple-flow",  # id MUST match key given in pygeoapi config
+    process_description = InternalProcessDescription(
         version="0.0.1",
         title="Simple flow Processor",
         description=(
             "An example processor that is powered by prefect and executes a simple flow"
         ),
-        jobControlOptions=[
-            ProcessJobControlOption.SYNC_EXECUTE,
-            ProcessJobControlOption.ASYNC_EXECUTE,
-        ],
         inputs={
             "name": ProcessInput(
                 title="Name",

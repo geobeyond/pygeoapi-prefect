@@ -179,26 +179,27 @@ class ProcessInput(ProcessOutput):
     additional_parameters: AdditionalProcessIOParameters | None = None
 
 
-class ProcessSummary(pydantic.BaseModel):
+JobControlOptions = Annotated[
+    list[ProcessJobControlOption], pydantic.Field(alias="jobControlOptions")]
+
+
+class InternalProcessDescription(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(use_enum_values=True)
 
     version: str
-    id: str
     title: dict[str, str] | str | None = None
     description: dict[str, str] | str | None = None
     keywords: list[str] | None = None
-    job_control_options: Annotated[
-        list[ProcessJobControlOption] | None,
-        pydantic.Field(alias="jobControlOptions")
-    ] = [ProcessJobControlOption.SYNC_EXECUTE]
+    # prefect-enabled processors can always run in either sync or async fashion
+    job_control_options: JobControlOptions = [
+        ProcessJobControlOption.SYNC_EXECUTE,
+        ProcessJobControlOption.ASYNC_EXECUTE
+    ]
     output_transmission: Annotated[
         list[ProcessOutputTransmissionMode] | None,
         pydantic.Field(alias="outputTransmission")
     ] = [ProcessOutputTransmissionMode.VALUE]
     links: list[Link] | None = None
-
-
-class ProcessDescription(ProcessSummary):
     inputs: dict[str, ProcessInput]
     outputs: dict[str, ProcessOutput]
     example: dict | None = None
