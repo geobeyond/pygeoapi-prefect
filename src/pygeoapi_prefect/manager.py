@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 MediaType = NewType("MediaType", str)
 ProcessId = NewType("ProcessId", str)
 ResponseHeaders = NewType("ResponseHeaders", dict[str, str])
+JobOutputs = str | dict | list | bytes
 
 
 
@@ -158,6 +159,7 @@ class PygeoapiProcessManagerProtocol(Protocol):
     ) -> tuple[
         PygeoapiPrefectJobId,
         MediaType,
+        JobOutputs,
         JobStatus,
         ResponseHeaders | None
     ]:
@@ -360,55 +362,17 @@ class PrefectManager:
             subscriber: Subscriber | None = None,
             requested_response: RequestedResponse | None = RequestedResponse.raw
     ) -> tuple[
-        PygeoapiPrefectJobId, MediaType, JobStatus, ResponseHeaders | None
+        PygeoapiPrefectJobId,
+        MediaType,
+        JobOutputs,
+        JobStatus,
+        ResponseHeaders | None
     ]:
-        """pygeoapi compatibility method.
-
-        Contrary to pygeoapi, which stores requested execution parameters as
-        a plain dictionary, pygeoapi-prefect rather uses a
-        `schemas.ExecuteRequest` instance instead - this allows parsing the
-        input data with the pydantic models crafted from the OGC API -
-        Processes schemas. Thus, this method performs a light validation of the
-        input data, converts it from a `dict` to an `ExecuteRequest` and
-        forwards it to the `_execute` method, where execution is handled.
-        Finally, it receives whatever results are generated and converts
-        back to the data structure expected by pygeoapi.
-        """
-        logger.debug(f"inside execute_process {locals()=}")
-        execution_result = self._execute(
-            processor=self.get_processor(process_id),
-            execution_request=schemas.ExecuteRequest(
-                inputs=data_,
-                outputs={
-                    k: schemas.ExecutionOutput(**v)
-                    for k, v in requested_outputs.items()
-                } if requested_outputs else None,
-                response=requested_response,
-                subscriber=subscriber,
-            ),
-            requested_execution_mode=execution_mode,
-        )
-        (job_id, output_media_type, generated_output, status, additional_headers) = (
-            execution_result
-        )
-        return (
-            job_id,
-            output_media_type,
-            status,
-            additional_headers,
-        )
-
-    def _execute(
-            self,
-            processor: PygeoapiProcessorProtocol,
-            execution_request: schemas.ExecuteRequest,
-            requested_execution_mode: RequestedProcessExecutionMode | None = None,
-    ) -> tuple[PygeoapiPrefectJobId, MediaType, Any, JobStatus, ResponseHeaders]:
         """Process execution handler.
 
         This manager is able to execute two types of processes:
 
-        - Normal pygeoapi processes, i.e. those that derive from
+        - Vanilla pygeoapi processes, i.e. those that derive from
           `pygeoapi.process.base.BaseProcessor`. These are made into prefect
           flows and are run with prefect. These always run locally.
 
@@ -417,31 +381,69 @@ class PrefectManager:
           able to take full advantage of prefect's features, which includes
           running elsewhere, as defined by deployments.
         """
+        logger.debug(f"inside execute_process {locals()=}")
+        execution_request = schemas.ExecuteRequest(
+            inputs=data_,
+            outputs={
+                k: schemas.ExecutionOutput(**v)
+                for k, v in requested_outputs.items()
+            } if requested_outputs else None,
+            response=requested_response,
+            subscriber=subscriber,
+        ),
         job_id = PygeoapiPrefectJobId(str(uuid.uuid4()))
-        if isinstance(processor, BasePrefectProcessor):
-            chosen_mode, additional_headers = select_prefect_processor_execution_mode(
-                requested_execution_mode, processor)
-            internal_job_status = self._execute_prefect_processor(
-                job_id, processor, chosen_mode, execution_request
-            )
-            return (
-                job_id,
-                None,
-                None,
-                internal_job_status.status,
-                additional_headers
-            )
-        else:
-            output_media_type, generated_output, current_job_status = (
-                self._execute_vanilla_processor_sync(job_id, processor, execution_request)
-            )
-            return (
-                job_id,
-                output_media_type,
-                generated_output,
-                current_job_status,
-                {"Preference-applied": RequestedProcessExecutionMode.wait.value},
-            )
+        # processor = self.get_processor(process_id)
+        match processor := self.get_processor(process_id):
+            case BasePrefectProcessor():
+                chosen_mode, headers = select_prefect_processor_execution_mode(
+                    execution_mode, processor)
+                internal_job_status = self._execute_prefect_processor(
+                    job_id, processor, chosen_mode, execution_request
+                )
+                return (
+                    job_id,
+                    None,
+                    None,
+                    internal_job_status.status,
+                    additional_headers
+                )
+            case BaseProcessor():
+                output_media_type, generated_output, current_job_status = (
+                    self._execute_vanilla_processor_sync(job_id, processor, execution_request)
+                )
+                return (
+                    job_id,
+                    output_media_type,
+                    generated_output,
+                    current_job_status,
+                    {"Preference-applied": RequestedProcessExecutionMode.wait.value},
+                )
+            case _:
+                raise ProcessorExecuteError("Unknown processor type")
+        # if isinstance(processor, BasePrefectProcessor):
+        #     chosen_mode, additional_headers = select_prefect_processor_execution_mode(
+        #         execution_mode, processor)
+        #     internal_job_status = self._execute_prefect_processor(
+        #         job_id, processor, chosen_mode, execution_request
+        #     )
+        #     return (
+        #         job_id,
+        #         None,
+        #         None,
+        #         internal_job_status.status,
+        #         additional_headers
+        #     )
+        # else:
+        #     output_media_type, generated_output, current_job_status = (
+        #         self._execute_vanilla_processor_sync(job_id, processor, execution_request)
+        #     )
+        #     return (
+        #         job_id,
+        #         output_media_type,
+        #         generated_output,
+        #         current_job_status,
+        #         {"Preference-applied": RequestedProcessExecutionMode.wait.value},
+        #     )
 
     def _execute_prefect_processor(
             self,
