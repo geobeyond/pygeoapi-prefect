@@ -404,9 +404,12 @@ class PrefectManager:
         processor = self.get_processor(process_id)
         # https://docs.prefect.io/v3/how-to-guides/deployments/run-deployments#run-a-deployment-from-python
         if chosen_mode == ProcessExecutionMode.sync_execute:
-            # if it's a BaseProcessor type, run our locally deployed flow
-            # if it's a PrefectProcessor type, run the name of the deployment
-            # 1. get the name of the deployment
+            # - if it's a BaseProcessor type, create a flow_run for our locally deployed
+            #   flow and then either run in blocking fashion or non-blocking
+            #   (by leveraging the timeout parameter)
+            # - if it's a PrefectProcessor type, create a flow run for the provided
+            #   name of the deployment, and either run blocking or non-blocking, like
+            #   the previous
             ...
         else:
             ...
