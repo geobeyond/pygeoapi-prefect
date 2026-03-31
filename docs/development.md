@@ -45,10 +45,12 @@ uv run prefect server start
 The prefect UI shall now be available at http://localhost:4200
 
 
-If you want to deploy a pygeoapi process locally with prefect, then also start a prefect agent:
+If you want to deploy a pygeoapi process locally with prefect, then also start a prefect worker. Here we specify a
+worker of type `process` (i.e. flow runs execute locally, by spawning aditional Python processes) which consumes from
+a pool named `pygeoapi`:
 
 ```shell
-uv run prefect agent start --type process --pool pygeoapi
+uv run prefect worker start --type process --pool pygeoapi
 ```
 
 Now stand up pygeoapi

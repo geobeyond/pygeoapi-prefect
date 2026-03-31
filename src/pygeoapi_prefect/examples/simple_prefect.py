@@ -23,11 +23,7 @@ from pygeoapi_prefect.schemas import (
 from pygeoapi_prefect.process import BasePrefectProcessor
 
 
-# When defining a prefect flow that will be deployed by prefect to some
-# infrastructure, be sure to specify persist_result=True - otherwise the
-# pygeoapi process manager will not be able to work properly
 @flow(
-    persist_result=True,
     log_prints=True,
 )
 def simple_flow(

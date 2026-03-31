@@ -25,10 +25,7 @@ from pygeoapi_prefect.schemas import (
 from pygeoapi_prefect.process import BasePrefectProcessor
 
 
-@flow(
-    persist_result=True,
-    log_prints=True,
-)
+@flow(log_prints=True)
 def hi_prefect_world(
     job_id: str,
     result_storage_block: str | None,
