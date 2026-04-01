@@ -5,6 +5,7 @@ import enum
 from typing import (
     Annotated,
     Any,
+    Literal,
     NewType,
 )
 
@@ -300,14 +301,38 @@ class OutputExecutionResultInternal(pydantic.BaseModel):
     media_type: str
 
 
-# class ExecutionDocumentSingleOutput(
-#     pydantic.RootModel[Union[ExecutionInputValueNoObject, ExecutionQualifiedInputValue, Link]]
-# ):
-#     pass
-#
-#
-# class ExecutionDocumentResult(pydantic.RootModel[dict[str, ExecutionDocumentSingleOutput]]):
-#     pass
+class JobStatusInfo(pydantic.BaseModel):
+    processor_metadata: dict
+    type_: Annotated[Literal["process"], pydantic.Field(serialization_alias="type")] = "process"
+    job_id: Annotated[str, pydantic.Field(serialization_alias="jobID")]
+    status: JobStatus
+    message: str | None = None
+    execution_parameters: dict[str, Any] | None = None
+    created: dt.datetime | None = None
+    started: dt.datetime | None = None
+    finished: dt.datetime | None = None
+    updated: dt.datetime | None = None
+    progress: Annotated[int | None, pydantic.Field(ge=0, le=100)] = None
+
+    def to_pygeoapi(self) -> dict[str, Any]:
+        output_media_types = [
+            out["schema"].get("contentMediaType", "application/octet-stream")
+            for out_id, out in self.processor_metadata.get("outputs", {}).items()
+        ]
+        return {
+            "created": self.created,
+            "finished": self.finished,
+            "identifier": self.job_id,
+            "message": self.message,
+            "mimetype": output_media_types[0],  # pygeoapi only supports a single output per processor
+            "parameters": self.execution_parameters,
+            "process_id": self.processor_metadata["id"],
+            "progress": self.progress,
+            "started": self.started,
+            "status": self.status.name,
+            "type": self.type_,
+            "updated": self.updated
+        }
 
 
 class JobStatusInfoBase(pydantic.BaseModel):
@@ -330,5 +355,12 @@ class JobStatusInfoInternal(JobStatusInfoBase):
 
 
 class JobList(pydantic.BaseModel):
-    jobs: list[JobStatusInfoInternal]
-    number_matched: Annotated[int, pydantic.Field(alias="numberMatched")]
+    jobs: list[JobStatusInfo]
+    number_matched: Annotated[int, pydantic.Field(serialization_alias="numberMatched")]
+
+    def to_pygeoapi(self) -> dict[str, list[dict] | int]:
+        """Return a suitable list of jobs for being processed by pygeoapi."""
+        return {
+            "jobs": [ji.to_pygeoapi() for ji in self.jobs],
+            "numberMatched": self.number_matched,
+        }

@@ -59,6 +59,7 @@ from .schemas import (
     JobList,
     JobOutputs,
     JobStatusInfoInternal,
+    JobStatusInfo,
     MediaType,
     OutputExecutionResultInternal,
     PrefectDeployment,
@@ -178,7 +179,7 @@ class PrefectManager:
         date_time: str | None = None,
         min_duration_seconds: int | None = None,
         max_duration_seconds: int | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, list[dict[str, Any]] | int]:
         """Get a list of jobs, optionally filtered by relevant parameters.
 
         Job list filters are not implemented in pygeoapi yet though, so for
@@ -197,7 +198,7 @@ class PrefectManager:
                 StateType.CANCELLING,
             ]
         try:
-            flow_runs = prefect_client.list_flow_runs(
+            flow_runs, total_matched = prefect_client.list_flow_runs(
                 prefect_states,
                 PygeoapiPrefectJobId.FLOW_RUN_NAME_PREFIX,
                 (limit if limit is not None else self._DEFAULT_PROCESS_LIST_LIMIT),
@@ -208,7 +209,7 @@ class PrefectManager:
             # TODO: would be more explicit to raise an exception,
             #  but pygeoapi is not able to handle this yet
             logger.error(f"Could not connect to prefect server: {str(err)}")
-            flow_runs = []
+            return JobList(jobs=[], number_matched=0).to_pygeoapi()
 
         seen_flows = {}
         jobs = []
@@ -216,16 +217,56 @@ class PrefectManager:
             if flow_run.flow_id not in seen_flows:
                 seen_flows[flow_run.flow_id] = prefect_client.get_flow(flow_run.flow_id)
             jobs.append(
-                get_job_status_from_flow_run(flow_run, seen_flows[flow_run.flow_id])
+                self.get_job_status_from_flow_run(
+                    flow_run, seen_flows[flow_run.flow_id])
             )
-        return JobList(
-            jobs=jobs,
-            numberMatched=0
-        ).model_dump(by_alias=True)
+        return JobList(jobs=jobs, number_matched=total_matched).to_pygeoapi()
 
-    def get_job(self, job_id: str) -> JobStatusInfoInternal:
-        """Get job details."""
-        return get_job_status(job_id)
+    def get_job(self, job_id: str) -> dict:
+        """Get job details from a Prefect flow run."""
+        try:
+            flow_run_details = prefect_client.get_flow_run(
+                PygeoapiPrefectJobId(job_id).to_flow_run_name())
+        except httpx.ConnectError as err:
+            # TODO: would be more explicit to raise an exception,
+            #  but pygeoapi is not able to handle this yet
+            logger.error(f"Could not connect to prefect server: {str(err)}")
+            flow_run_details = None
+
+        if flow_run_details is None:
+            raise JobNotFoundError()
+        else:
+            flow_run, prefect_flow = flow_run_details
+            return self.get_job_status_from_flow_run(
+                flow_run, prefect_flow).to_pygeoapi()
+
+    def get_job_result(self, job_id: str) -> tuple[MediaType, Any]:
+        try:
+            flow_run_details = prefect_client.get_flow_run(
+                PygeoapiPrefectJobId(job_id).to_flow_run_name())
+        except httpx.ConnectError as err:
+            # TODO: would be more explicit to raise an exception,
+            #  but pygeoapi is not able to handle this yet
+            logger.error(f"Could not connect to prefect server: {str(err)}")
+            flow_run_details = None
+        if flow_run_details is None:
+            raise JobNotFoundError()
+        else:
+            flow_run, prefect_flow = flow_run_details
+            if not flow_run.state_type == StateType.COMPLETED:
+                raise RuntimeError("Job is not completed")
+            process_id = ProcessId(prefect_flow.name)
+            processor = self.get_processor(process_id)
+            if isinstance(processor, BasePrefectProcessor):
+                return _retrieve_result_from_prefect(
+                    result_storage_block=processor.deployment_info.result_storage_block,
+                    result_storage_key_template=processor.deployment_info.result_storage_key_template
+                )
+            else:
+                return _retrieve_result_from_prefect(
+                    result_storage_block=None,
+                    result_storage_key_template=f"{job_id}.pickle"
+                )
 
     def delete_job(  # type: ignore [empty-body]
         self, job_id: str
@@ -327,6 +368,7 @@ class PrefectManager:
     ) -> JobStatus:
         flow_run = run_deployment(
             name=execution_request.deployment_info.name,
+            flow_run_name=job_id.to_flow_run_name(),
             parameters={
                 "processor_id": processor.metadata["id"],
                 "pygeoapi_job_id": job_id,
@@ -359,19 +401,10 @@ class PrefectManager:
                 f"Processor took longer than "
                 f"{self.sync_job_execution_timeout_seconds}s to execute"
             )
-
-        # defer determination of the result storage to Prefect, in order to allow
-        # for external configuration
-        result_store = ResultStore(
-            result_storage=execution_request.deployment_info.result_storage_block
+        return _retrieve_result_from_prefect(
+            result_storage_block=execution_request.deployment_info.result_storage_block,
+            result_storage_key_template=execution_request.deployment_info.result_storage_key_template
         )
-        result_record: ResultRecord = result_store.read(
-            execution_request.deployment_info.result_storage_key_template)
-        logger.debug(f"debug {result_record=}")
-        print(f"print {result_record=}")
-        media_type = MediaType(result_record.result[0])
-        generated_output = result_record.result[1]
-        return media_type, generated_output
 
 
     def get_output_data_raw(
@@ -397,196 +430,37 @@ class PrefectManager:
         # we need to convert internal location into a proper href for a link
         return super().get_output_data_link_href(generated_output, process_id)
 
+    def get_job_status_from_flow_run(
+            self,
+            flow_run: FlowRun,
+            prefect_flow: Flow
+    ) -> JobStatusInfo:
+        job_id = PygeoapiPrefectJobId.from_flow_run_name(flow_run.name)
+        process_id = ProcessId(prefect_flow.name)
+        processor = self.get_processor(process_id)
 
-def get_job_status(job_id: str) -> JobStatusInfoInternal:
-    """Get job details from a Prefect flow run."""
-    try:
-        flow_run_details = prefect_client.get_flow_run(
-            PygeoapiPrefectJobId(job_id).to_flow_run_name())
-    except httpx.ConnectError as err:
-        # TODO: would be more explicit to raise an exception,
-        #  but pygeoapi is not able to handle this yet
-        logger.error(f"Could not connect to prefect server: {str(err)}")
-        flow_run_details = None
-
-    if flow_run_details is None:
-        raise JobNotFoundError()
-    else:
-        flow_run, prefect_flow = flow_run_details
-        return get_job_status_from_flow_run(flow_run, prefect_flow)
-
-
-def get_job_status_from_flow_run(
-        flow_run: FlowRun,
-        prefect_flow: Flow
-) -> JobStatusInfoInternal:
-    job_id = PygeoapiPrefectJobId.from_flow_run_name(flow_run.name)
-    logger.info(f"{flow_run=}")
-    logger.info(f"{flow_run.parameters=}")
-    logger.info(f"{job_id=}")
-    try:
-        media_type, generated_output = flow_run.state.result()
-        logger.info(f"{media_type=}")
-        logger.info(f"{generated_output=}")
-    except MissingResult as err:
-        logger.warning(f"Could not get flow_run results: {err}")
-        generated_output = None
-    execution_request = ExecuteRequest(**flow_run.parameters["execution_request"])
-    logger.info(f"{execution_request=}")
-    logger.info(f"{flow_run.state_type=}")
-    return JobStatusInfoInternal(
-        jobID=job_id,
-        status=PREFECT_STATE_MAP[flow_run.state_type],
-        processID=prefect_flow.name,
-        created=flow_run.created,
-        started=flow_run.start_time,
-        finished=flow_run.end_time,
-        requested_response_type=execution_request.response,
-        requested_outputs=execution_request.outputs,
-        generated_outputs=generated_output,
-    )
-
-
-def execute_vanilla_processor_sync(
-        job_id: PygeoapiPrefectJobId,
-        processor: PygeoapiProcessorProtocol,
-        execution_request: ExecuteRequest,
-        output_dir: Path | None,
-        prefect_worker_pool: str | None = None,
-) -> tuple[MediaType, Any, JobStatus]:
-    """Execute a regular pygeoapi processor locally via prefect.
-
-    This wraps the pygeoapi processor.execute() call in a prefect flow,
-    which is then run locally in a blocking way.
-
-    This function stores the generated outputs on disk if given an
-    `output_dir`. This emulates the same behavior of the base
-    pygeoapi prefect manager, which keeps generated files on disk to be able
-    to provide clients with means to re-fetch generated files via the
-    corresponding jon details page
-    """
-
-    @flow(
-        name=processor.metadata["id"],
-        version=processor.metadata["version"],
-        flow_run_name=job_id.to_flow_run_name(),
-        persist_result=True,
-        log_prints=True,
-        validate_parameters=True,
-        retries=0,  # this should be configurable
-        retry_delay_seconds=0,  # this should be configurable
-        timeout_seconds=None,  # this should be configurable
-    )
-    def executor(data_: dict, outputs=None) -> tuple[str, Any]:
-        """Run a vanilla pygeoapi process as a prefect flow.
-
-        Since we are adapting a vanilla pygeoapi processor to run with
-        prefect, we must ensure the processor is called with the expected
-        parameters.
-
-        The expectations of this function are that the underlying pygeoapi
-        processor does whatever computation it needs and then returns a single
-        pair of:
-
-        - media_type, which is a string with the media type of the generated output
-        - generated output, which is either a `bytes` with the raw output or a
-          Python data structure, to be serialized to JSON by the caller, if the
-          media_type is set to `application/json`.
-
-        Note that this implies that a processor job is not allowed to generate
-        multiple outputs, unless they are packed together (for example as a
-        JSON object).
-        """
-        return processor.execute(data_, outputs)
-
-    execution_parameters = execution_request.model_dump(
-        by_alias=True, exclude_none=True)
-    try:
-        # calling a Prefect flow directly, like we do here, causes it to
-        # create a flow_run that executes locally in a blocking fashion -
-        # this means it runs in sync mode
-        output_media_type, generated_output = executor(
-            data_=execution_parameters.get("inputs", {}),
-            outputs=execution_parameters.get("outputs")
+        return JobStatusInfo(
+            job_id=job_id,
+            processor_metadata=processor.metadata,
+            execution_parameters=flow_run.parameters,
+            status=PREFECT_STATE_MAP[flow_run.state_type],
+            created=flow_run.created,
+            started=flow_run.start_time,
+            finished=flow_run.end_time,
         )
-    except Exception as err:
-        raise ProcessorExecuteError(str(err)) from err
-
-    if output_dir:
-        file_name = "_".join((processor.metadata["id"], job_id, "output"))
-        target_path = output_dir / file_name
-        logger.debug(f"Persisting output to disk...")
-        if isinstance(generated_output, (dict, list)):
-            target_path.write_text(
-                json.dumps(generated_output, sort_keys=True, indent=4))
-        else:
-            target_path.write_bytes(bytes(generated_output))
-
-    return MediaType(output_media_type), generated_output, JobStatus.successful
 
 
-def execute_prefect_processor(
-        job_id: PygeoapiPrefectJobId,
-        processor: BasePrefectProcessor,
-        chosen_mode: ProcessExecutionMode,
-        execution_request: ExecuteRequest,
-) -> JobStatusInfoInternal:
-    """Execute a prefect-based pygeoapi processor.
-
-    Execution is performed in one of three ways:
-
-    - If there is a deployment for the process, then run wherever the
-      deployment is housed. Depending on the chosen execution mode, runs
-      either:
-        - asynchronously
-        - synchronously
-    - If there is no deployment for the process, then run locally and
-      synchronously
-    """
-    run_params = {
-        "job_id": job_id,
-        "result_storage_block": processor.result_storage_block,
-        "process_description": processor.process_description.model_dump(
-            by_alias=True, exclude_none=True
-        ),
-        "execution_request": execution_request.model_dump(
-            by_alias=True, exclude_none=True
-        ),
-    }
-    if processor.deployment_info is None:
-        flow_fn = processor.process_flow
-        flow_fn.flow_run_name = job_id.to_flow_run_name()
-        flow_fn.persist_result = True
-        flow_fn.log_prints = True
-        if chosen_mode == ProcessExecutionMode.sync_execute:
-            logger.info("synchronous execution without deployment")
-            flow_fn(**run_params)
-        else:
-            raise NotImplementedError("Cannot run undeployed prefect flows async")
-    else:
-        # if there is a deployment, then we must rely on the flow function
-        # having been explicitly configured to:
-        # - persist results
-        # - log prints
-        #
-        # deployed flows cannot be modified in the same way as local ones
-        deployment_name = (
-            f"{processor.pygeoapi_resource_id}/{processor.deployment_info.name}"
-        )
-        run_kwargs = {
-            "name": deployment_name,
-            "parameters": run_params,
-            "flow_run_name": job_id.to_flow_run_name(),
-        }
-        if chosen_mode == ProcessExecutionMode.sync_execute:
-            logger.info("synchronous execution with deployment")
-            run_deployment(**run_kwargs)
-        else:
-            logger.info("asynchronous execution")
-            run_deployment(
-                **run_kwargs,
-                timeout=0,  # has the effect of returning immediately
-            )
-    updated_status_info = get_job_status(job_id)
-    logger.info(f"updated_status_info: {updated_status_info}")
-    return updated_status_info
+def _retrieve_result_from_prefect(
+        result_storage_block: str | None,
+        result_storage_key_template: str,
+) -> tuple[MediaType, Any]:
+    # defer determination of the result storage to Prefect, in order to allow
+    # for external configuration
+    result_store = ResultStore(result_storage=result_storage_block)
+    result_record: ResultRecord = result_store.read(
+        result_storage_key_template)
+    logger.debug(f"debug {result_record=}")
+    print(f"print {result_record=}")
+    media_type = MediaType(result_record.result[0])
+    generated_output = result_record.result[1]
+    return media_type, generated_output

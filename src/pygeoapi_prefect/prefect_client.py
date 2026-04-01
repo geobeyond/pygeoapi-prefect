@@ -12,7 +12,7 @@ def list_flow_runs(
         name_like: str | None = None,
         limit: int | None = None,
         offset: int = 0,
-) -> list[FlowRun]:
+) -> tuple[list[FlowRun], int]:
     """Retrieve existing prefect flow_runs, optionally filtered by state and name"""
     print(f"{locals()=}")
     if states is not None:
@@ -26,14 +26,17 @@ def list_flow_runs(
     else:
         name_like_filter = None
     with get_client(sync_client=True) as client:
-        return client.read_flow_runs(
-            flow_run_filter=filters.FlowRunFilter(
-                state=state_filter,
-                name=name_like_filter,
-            ),
+        flow_run_filter = filters.FlowRunFilter(
+            state=state_filter,
+            name=name_like_filter,
+        )
+        flow_runs = client.read_flow_runs(
+            flow_run_filter=flow_run_filter,
             limit=limit,
             offset=offset
         )
+        total_matched = client.count_flow_runs(flow_run_filter=flow_run_filter)
+    return flow_runs, total_matched
 
 
 async def old_list_flow_runs(
