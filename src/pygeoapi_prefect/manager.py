@@ -5,34 +5,36 @@ import importlib
 import json
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import (
+    Mapping,
+    Sequence,
+)
 from pathlib import Path
 from typing import (
     Any,
-    NewType,
-    Protocol,
     Type,
 )
 
-import anyio
 import httpx
-import jsonschema
 import jsonschema.exceptions
 import jsonschema.validators
-from jsonschema.protocols import Validator
 from prefect import flow
 from prefect.blocks.core import Block
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.exceptions import MissingResult
+from prefect.results import (
+    ResultRecord,
+    ResultStore,
+)
 from prefect.server.schemas.core import Flow
 from prefect.server.schemas.states import StateType
-from prefect.task_runners import ConcurrentTaskRunner
 
 from pygeoapi.process.base import (
     BaseProcessor,
     JobNotFoundError,
     ProcessorExecuteError,
+    ProcessError,
     UnknownProcessError,
 )
 from pygeoapi.plugin import load_plugin
@@ -47,21 +49,27 @@ from pygeoapi.util import (
 from . import (
     exceptions,
     prefect_client,
-    schemas,
     vanilla_flow,
 )
-from .process import (
-    BasePrefectProcessor,
-    OldBasePrefectProcessor,
+from .process import BasePrefectProcessor
+from .protocols import PygeoapiProcessorProtocol
+from .schemas import (
+    ExecuteRequest,
+    ExecutionOutput,
+    JobList,
+    JobOutputs,
+    JobStatusInfoInternal,
+    MediaType,
+    OutputExecutionResultInternal,
+    PrefectDeployment,
+    ProcessId,
+    ProcessJobControlOption,
+    PygeoapiPrefectJobId,
+    ResponseHeaders,
 )
 
 logger = logging.getLogger(__name__)
 
-
-MediaType = NewType("MediaType", str)
-ProcessId = NewType("ProcessId", str)
-ResponseHeaders = NewType("ResponseHeaders", dict[str, str])
-JobOutputs = str | dict | list | bytes
 
 PREFECT_STATE_MAP = {
     StateType.SCHEDULED: JobStatus.accepted,
@@ -74,109 +82,6 @@ PREFECT_STATE_MAP = {
     StateType.PAUSED: JobStatus.accepted,
     StateType.CANCELLING: JobStatus.dismissed,
 }
-
-
-class PygeoapiPrefectJobId(str):
-    FLOW_RUN_NAME_PREFIX = "pygeoapi_job_"
-
-    def to_flow_run_name(self) -> str:
-        return f"{self.FLOW_RUN_NAME_PREFIX}{self}"
-
-    @classmethod
-    def from_flow_run_name(cls, flow_run_name: str) -> "PygeoapiPrefectJobId":
-        return cls(flow_run_name.replace(cls.FLOW_RUN_NAME_PREFIX, ""))
-
-
-class PygeoapiProcessorProtocol(Protocol):
-
-    @property
-    def name(self) -> str: ...
-
-    @property
-    def metadata(self) -> dict[str, Any]: ...
-
-    @property
-    def supports_outputs(self) -> bool: ...
-
-    def set_job_id(self, job_id: str) -> None: ...
-
-    def execute(
-            self,
-            data_: dict[str, Any],
-            outputs: list[str] | dict[str, Any] | None = None
-    ) -> tuple[str, Any]: ...
-
-
-class PygeoapiProcessManagerProtocol(Protocol):
-
-    def __init__(self, manager_def: dict[str, Any]) -> None: ...
-
-    @property
-    def is_async(self) -> bool: ...
-
-    @property
-    def name(self) -> str: ...
-
-    @property
-    def supports_subscribing(self) -> bool: ...
-
-    @property
-    def connection(self) -> Any: ...
-
-    @property
-    def output_dir(self) -> Path | None: ...
-
-    @property
-    def processes(self) -> dict[str, dict[str, Any]]:
-        """Return processor configurations known to the manager"""
-
-    def get_processor(
-            self,
-            process_id: ProcessId
-    ) -> PygeoapiProcessorProtocol:
-        """Instantiate a processor."""
-
-    def get_jobs(
-            self,
-            status: JobStatus | None = None,
-            limit: int | None = None,
-            offset: int | None = None
-    ) -> dict[str, Any]:
-        """Get process-related jobs"""
-
-    def get_job(self, job_id: str) -> dict:
-        """Get a process-related job"""
-
-    # add_job is only used internally by BaseProcess instances. Therefore, it
-    # should not be part of the protocol. Jobs are created
-    # implicitly by calling execute_process
-    # def add_job(self, job_metadata: dict) -> JobId: ...
-
-    # update_job is only used internally by BaseProcess instances. Therefore,
-    # it should not be part of the protocol. Jobs are updated internally by
-    # the handler of execute_process, as the execution progresses
-    # def update_job(self, job_id: JobId, job_metadata: dict) -> bool: ...
-
-    def delete_job(self, job_id: str) -> bool: ...
-
-    def get_job_result(self, job_id: str) -> tuple[MediaType, Any]: ...
-
-    def execute_process(
-            self,
-            process_id: ProcessId,
-            data_: dict,
-            execution_mode: RequestedProcessExecutionMode | None = None,
-            requested_outputs: dict[str, Any] | None = None,
-            subscriber: Subscriber | None = None,
-            requested_response: RequestedResponse | None = RequestedResponse.raw.value
-    ) -> tuple[
-        PygeoapiPrefectJobId,
-        MediaType,
-        JobOutputs,
-        JobStatus,
-        ResponseHeaders | None
-    ]:
-        """Execute a process"""
 
 
 class PrefectManager:
@@ -211,15 +116,20 @@ class PrefectManager:
     connection: Any = None
     name: str
     output_dir: Path | None = None
+    sync_job_execution_timeout_seconds: int
 
     def __init__(self, manager_def: dict[str, Any]):
         self.name = ".".join(
             (self.__class__.__module__, self.__class__.__qualname__)
         )
         self._processor_configurations = {}
+        self.sync_job_execution_timeout_seconds = max(
+            1,
+            manager_def.get("sync_job_execution_timeout_seconds", 60)
+        )
         for id_, resource_conf in manager_def.get("processes", {}).items():
             self._processor_configurations[ProcessId(id_)] = copy.deepcopy(resource_conf)
-            logger.debug(f"Validating processor {id_!r}...")
+            print(f"Validating processor {id_!r}...")
             self._validate_processor_configuration(self.get_processor(id_))
 
     def _validate_processor_configuration(
@@ -287,13 +197,13 @@ class PrefectManager:
                 StateType.CANCELLING,
             ]
         try:
-            flow_runs = anyio.run(
-                prefect_client.list_flow_runs,
+            flow_runs = prefect_client.list_flow_runs(
                 prefect_states,
                 PygeoapiPrefectJobId.FLOW_RUN_NAME_PREFIX,
                 (limit if limit is not None else self._DEFAULT_PROCESS_LIST_LIMIT),
                 (offset if offset is not None else self._DEFAULT_PROCESS_LIST_LIMIT)
             )
+            print(f"{flow_runs=}")
         except httpx.ConnectError as err:
             # TODO: would be more explicit to raise an exception,
             #  but pygeoapi is not able to handle this yet
@@ -304,198 +214,169 @@ class PrefectManager:
         jobs = []
         for flow_run in flow_runs:
             if flow_run.flow_id not in seen_flows:
-                seen_flows[flow_run.flow_id] = anyio.run(
-                    prefect_client.get_flow, flow_run.flow_id)
+                seen_flows[flow_run.flow_id] = prefect_client.get_flow(flow_run.flow_id)
             jobs.append(
                 get_job_status_from_flow_run(flow_run, seen_flows[flow_run.flow_id])
             )
-        return schemas.JobList(
+        return JobList(
             jobs=jobs,
             numberMatched=0
         ).model_dump(by_alias=True)
 
-    def get_job(self, job_id: str) -> schemas.JobStatusInfoInternal:
+    def get_job(self, job_id: str) -> JobStatusInfoInternal:
         """Get job details."""
         return get_job_status(job_id)
 
     def delete_job(  # type: ignore [empty-body]
         self, job_id: str
-    ) -> schemas.JobStatusInfoInternal:
+    ) -> JobStatusInfoInternal:
         """Delete a job and associated results/outputs."""
         pass
 
     def get_processor(self, process_id: ProcessId) -> PygeoapiProcessorProtocol:
         if (resource_conf := self._processor_configurations.get(process_id)) is None:
             raise UnknownProcessError(f"processor with id {process_id!r} is not known")
-        if (
-                processor_prefect_conf := resource_conf["processor"].get("prefect")
-        ) is not None:
+        if resource_conf["processor"].get("prefect"):
             module_path, processor_type_name = (
                 resource_conf["processor"]["name"].rpartition(".")[::2]
             )
             loaded_module = importlib.import_module(module_path)
             processor_type: Type[BasePrefectProcessor] = getattr(
                 loaded_module, processor_type_name)
-            deployment_info = schemas.PrefectDeployment(
-                name=deployment["name"],
-                queue=deployment["queue"],
-                storage_block=deployment.get("storage_block"),
-                storage_sub_path=deployment.get("storage_sub_path"),
-            ) if (deployment := processor_prefect_conf.get("deployment")) else None
-            processor: PygeoapiProcessorProtocol = processor_type(
-                pygeoapi_resource_id=process_id,
-                deployment_info=deployment_info,
-                result_storage_block=processor_prefect_conf.get("result_storage"),
-            )
-            return processor
+            processor = processor_type.from_pygeoapi_conf(
+                process_id, resource_conf["processor"])
+            # override whatever job control options there might be on the processor
+            processor.process_description.job_control_options = [
+                ProcessJobControlOption.SYNC_EXECUTE,
+                ProcessJobControlOption.ASYNC_EXECUTE,
+            ]
         else:
-            return load_plugin("process", resource_conf["processor"])
+            processor = load_plugin("process", resource_conf["processor"])
+            # override whatever job control options there might be on the processor
+            processor.metadata["jobControlOptions"] = [
+                ProcessJobControlOption.SYNC_EXECUTE,
+                ProcessJobControlOption.ASYNC_EXECUTE,
+            ]
+        return processor
 
     def execute_process(
             self,
             process_id: ProcessId,
-            data_: dict,
+            data_: dict[str, Any] | None,
             execution_mode: RequestedProcessExecutionMode | None = None,
-            requested_outputs: dict[str, Any] | None = None,
+            requested_outputs: dict[str, dict] | list[str] | None = None,
             subscriber: Subscriber | None = None,
             requested_response: RequestedResponse | None = RequestedResponse.raw
     ) -> tuple[
         PygeoapiPrefectJobId,
-        MediaType,
-        JobOutputs,
+        MediaType | None,
+        JobOutputs | None,
         JobStatus,
         ResponseHeaders | None
     ]:
-        """Process execution handler.
+        job_id = PygeoapiPrefectJobId(str(uuid.uuid4()))
+        response_headers = ResponseHeaders(
+            {"Preference-Applied": RequestedProcessExecutionMode.wait.value})
+        chosen_mode = ProcessExecutionMode.sync_execute
+        if execution_mode == RequestedProcessExecutionMode.respond_async:
+            chosen_mode = ProcessExecutionMode.async_execute
+            response_headers["Preference-Applied"] = RequestedProcessExecutionMode.respond_async.value
 
-        This manager is able to execute two types of processes:
-
-        - Vanilla pygeoapi processes, i.e. those that derive from
-          `pygeoapi.process.base.BaseProcessor`. These are made into prefect
-          flows and are run with prefect. These always run locally.
-
-        - Custom prefect-aware processes, which derive from
-          `pygeoapi_prefect.processes.base.BasePrefectProcessor`. These are
-          able to take full advantage of prefect's features, which includes
-          running elsewhere, as defined by deployments.
-
-        Regardless of process type, and depending on the accepted execution
-        mode, which takes into account the `execution_mode` parameter and the
-        capabilities of the processor and the process manager, execution can
-        either be:
-
-        - sync: the processing is done immediately and in a blocking fashion,
-          with outputs (if any) being returned at the end
-        - async: processing is done later and the return is just a status
-          update
-
-        """
-        execution_request = schemas.ExecuteRequest(
+        match processor := self.get_processor(process_id):
+            case BasePrefectProcessor():
+                deployment_info = processor.deployment_info
+            case BaseProcessor():
+                deployment_info = PrefectDeployment(
+                    name=f"{process_id}/{vanilla_flow.get_deployment_name(process_id)}",
+                    result_storage_block=None,
+                    result_storage_key_template=f"{job_id}.pickle"
+                )
+            case _:
+                raise ProcessError(f"Unknown processor type {type(processor)!r}")
+        if isinstance(requested_outputs, Sequence) and not isinstance(requested_outputs, str):
+            outs = {out_name: ExecutionOutput() for out_name in requested_outputs}
+        elif isinstance(requested_outputs, Mapping):
+            outs = {
+                out_name: ExecutionOutput(**out_info)
+                for out_name, out_info in requested_outputs.items()
+            }
+        else:
+            outs = None
+        execution_request = ExecuteRequest(
+            deployment_info=deployment_info,
             inputs=data_,
-            outputs={
-                k: schemas.ExecutionOutput(**v)
-                for k, v in requested_outputs.items()
-            } if requested_outputs else None,
+            outputs=outs,
             response=requested_response,
             subscriber=subscriber,
         )
-        job_id = PygeoapiPrefectJobId(str(uuid.uuid4()))
-        chosen_mode, headers = select_execution_mode(execution_mode)
-        processor = self.get_processor(process_id)
-        # https://docs.prefect.io/v3/how-to-guides/deployments/run-deployments#run-a-deployment-from-python
         if chosen_mode == ProcessExecutionMode.sync_execute:
-            # - if it's a BaseProcessor type, create a flow_run for our locally deployed
-            #   flow and then either run in blocking fashion or non-blocking
-            #   (by leveraging the timeout parameter)
-            # - if it's a PrefectProcessor type, create a flow run for the provided
-            #   name of the deployment, and either run blocking or non-blocking, like
-            #   the previous
-            ...
+            media_type, generated_output = self._execute_job_sync(
+                job_id, processor, execution_request)
+            print(f"{media_type=}")
+            print(f"{generated_output=}")
+            return job_id, media_type, generated_output, JobStatus.successful, response_headers
         else:
-            ...
-        match processor, chosen_mode:
-            case BasePrefectProcessor(), ProcessExecutionMode.sync_execute:
-                ...
-            case BasePrefectProcessor(), ProcessExecutionMode.async_execute:
-                ...
-            case BaseProcessor(), ProcessExecutionMode.sync_execute:
-                ...
-            case BaseProcessor(), ProcessExecutionMode.async_execute:
-                ...
-            case _:
-                raise ProcessorExecuteError("Unknown processor type")
+            status = self._execute_job_async(job_id, processor, execution_request)
+            return job_id, None, None, status, response_headers
 
-    def _execute_prefect_processor(
+    def _execute_job_async(
             self,
             job_id: PygeoapiPrefectJobId,
-            processor: BasePrefectProcessor,
-            chosen_mode: ProcessExecutionMode,
-            execution_request: schemas.ExecuteRequest,
-    ) -> schemas.JobStatusInfoInternal:
-        """Execute a custom prefect processor.
+            processor: BaseProcessor | BasePrefectProcessor,
+            execution_request: ExecuteRequest,
+    ) -> JobStatus:
+        flow_run = run_deployment(
+            name=execution_request.deployment_info.name,
+            parameters={
+                "processor_id": processor.metadata["id"],
+                "pygeoapi_job_id": job_id,
+                "inputs": execution_request.inputs,
+                "outputs": execution_request.outputs,
+            },
+            timeout=0  # a value of zero means run in non-blocking fashion
+        )
+        return self.prefect_state_map[flow_run.state_type]
 
-        Execution is performed in one of three ways:
-
-        - If there is a deployment for the process, then run wherever the
-          deployment is housed. Depending on the chosen execution mode, runs
-          either:
-            - asynchronously
-            - synchronously
-        - If there is no deployment for the process, then run locally and
-          synchronously
-        """
-        run_params = {
-            "job_id": job_id,
-            "result_storage_block": processor.result_storage_block,
-            "process_description": processor.process_description.model_dump(
-                by_alias=True, exclude_none=True
-            ),
-            "execution_request": execution_request.model_dump(
-                by_alias=True, exclude_none=True
-            ),
-        }
-        if processor.deployment_info is None:
-            flow_fn = processor.process_flow
-            flow_fn.flow_run_name = job_id.to_flow_run_name()
-            flow_fn.persist_result = True
-            flow_fn.log_prints = True
-            if chosen_mode == ProcessExecutionMode.sync_execute:
-                logger.info("synchronous execution without deployment")
-                processor.process_flow(**run_params)
-            else:
-                raise NotImplementedError("Cannot run regular processes async")
-        else:
-            # if there is a deployment, then we must rely on the flow function
-            # having been explicitly configured to:
-            # - persist results
-            # - log prints
-            #
-            # deployed flows cannot be modified in the same way as local ones
-            deployment_name = (
-                f"{processor.process_description.id}/{processor.pygeoapi_resource_id}"
+    def _execute_job_sync(
+            self,
+            job_id: PygeoapiPrefectJobId,
+            processor: BaseProcessor | BasePrefectProcessor,
+            execution_request: ExecuteRequest,
+    ) -> tuple[MediaType, Any]:
+        flow_run = run_deployment(
+            name=execution_request.deployment_info.name,
+            flow_run_name=job_id.to_flow_run_name(),
+            parameters={
+                "processor_id": processor.metadata["id"],
+                "pygeoapi_job_id": job_id,
+                "inputs": execution_request.inputs,
+                "outputs": execution_request.outputs,
+            },
+            timeout=self.sync_job_execution_timeout_seconds
+        )
+        if flow_run.state_type != StateType.COMPLETED:
+            raise ProcessorExecuteError(
+                f"Processor took longer than "
+                f"{self.sync_job_execution_timeout_seconds}s to execute"
             )
-            run_kwargs = {
-                "name": deployment_name,
-                "parameters": run_params,
-                "flow_run_name": job_id.to_flow_run_name(),
-            }
-            if chosen_mode == ProcessExecutionMode.sync_execute:
-                logger.info("synchronous execution with deployment")
-                run_deployment(**run_kwargs)
-            else:
-                logger.info("asynchronous execution")
-                run_deployment(
-                    **run_kwargs,
-                    timeout=0,  # has the effect of returning immediately
-                )
-        updated_status_info = self.get_job(job_id)
-        logger.info(f"updated_status_info: {updated_status_info}")
-        return updated_status_info
+
+        # defer determination of the result storage to Prefect, in order to allow
+        # for external configuration
+        result_store = ResultStore(
+            result_storage=execution_request.deployment_info.result_storage_block
+        )
+        result_record: ResultRecord = result_store.read(
+            execution_request.deployment_info.result_storage_key_template)
+        logger.debug(f"debug {result_record=}")
+        print(f"print {result_record=}")
+        media_type = MediaType(result_record.result[0])
+        generated_output = result_record.result[1]
+        return media_type, generated_output
 
 
     def get_output_data_raw(
             self,
-            generated_output: schemas.OutputExecutionResultInternal,
+            generated_output: OutputExecutionResultInternal,
             process_id: ProcessId
     ) -> bytes:
         """Get output data as bytes."""
@@ -511,19 +392,17 @@ class PrefectManager:
         return result
 
     def get_output_data_link_href(
-        self, generated_output: schemas.OutputExecutionResultInternal, process_id: str
+        self, generated_output: OutputExecutionResultInternal, process_id: str
     ) -> str:
         # we need to convert internal location into a proper href for a link
         return super().get_output_data_link_href(generated_output, process_id)
 
 
-def get_job_status(job_id: str) -> schemas.JobStatusInfoInternal:
+def get_job_status(job_id: str) -> JobStatusInfoInternal:
     """Get job details from a Prefect flow run."""
     try:
-        flow_run_details = anyio.run(
-            prefect_client.get_flow_run,
-            PygeoapiPrefectJobId(job_id).to_flow_run_name()
-        )
+        flow_run_details = prefect_client.get_flow_run(
+            PygeoapiPrefectJobId(job_id).to_flow_run_name())
     except httpx.ConnectError as err:
         # TODO: would be more explicit to raise an exception,
         #  but pygeoapi is not able to handle this yet
@@ -540,7 +419,7 @@ def get_job_status(job_id: str) -> schemas.JobStatusInfoInternal:
 def get_job_status_from_flow_run(
         flow_run: FlowRun,
         prefect_flow: Flow
-) -> schemas.JobStatusInfoInternal:
+) -> JobStatusInfoInternal:
     job_id = PygeoapiPrefectJobId.from_flow_run_name(flow_run.name)
     logger.info(f"{flow_run=}")
     logger.info(f"{flow_run.parameters=}")
@@ -552,10 +431,10 @@ def get_job_status_from_flow_run(
     except MissingResult as err:
         logger.warning(f"Could not get flow_run results: {err}")
         generated_output = None
-    execution_request = schemas.ExecuteRequest(**flow_run.parameters["execution_request"])
+    execution_request = ExecuteRequest(**flow_run.parameters["execution_request"])
     logger.info(f"{execution_request=}")
     logger.info(f"{flow_run.state_type=}")
-    return schemas.JobStatusInfoInternal(
+    return JobStatusInfoInternal(
         jobID=job_id,
         status=PREFECT_STATE_MAP[flow_run.state_type],
         processID=prefect_flow.name,
@@ -568,55 +447,10 @@ def get_job_status_from_flow_run(
     )
 
 
-def select_execution_mode(
-        requested: RequestedProcessExecutionMode | None,
-) -> tuple[ProcessExecutionMode, dict[str, str]]:
-    """Select the execution mode to be employed for the input processor.
-
-    According to the OGC API - Processes (Section 7.11.2.3, Requirement 25)
-    the execution mode shall default to `sync` mode of omitted by the client
-    (and supported by the server). The Prefect process manager is able to
-    run in either sync or async modes, regardless of the processor.
-    """
-    headers = {"Preference-Applied": RequestedProcessExecutionMode.wait.value}
-    chosen = ProcessExecutionMode.sync_execute
-    if requested == RequestedProcessExecutionMode.respond_async:
-        chosen = ProcessExecutionMode.async_execute
-        headers["Preference-Applied"] = RequestedProcessExecutionMode.respond_async.value
-    return chosen, headers
-
-
-def select_prefect_processor_execution_mode(
-        requested: RequestedProcessExecutionMode | None,
-        processor: BasePrefectProcessor,
-) -> tuple[ProcessExecutionMode, dict[str, str]]:
-    """Select the execution mode to be employed in a prefect processor.
-
-    The execution mode to use depends on a number of factors:
-
-    - what mode, if any, was requested by the client?
-    - does the process support sync and async execution modes?
-    - does the process manager support sync and async modes?
-    """
-    chosen = ProcessExecutionMode.sync_execute
-    headers = {
-        "Preference-Applied": RequestedProcessExecutionMode.wait.value
-    }
-    if requested == RequestedProcessExecutionMode.respond_async:
-        if ProcessExecutionMode.async_execute in processor.process_description.job_control_options:
-            if processor.deployment_info is not None:
-                chosen = ProcessExecutionMode.async_execute
-                headers["Preference-Applied"] = (
-                    RequestedProcessExecutionMode.respond_async.value)
-            else:
-                logger.warning("Cannot run asynchronously on non-deployed processors")
-    return chosen, headers
-
-
 def execute_vanilla_processor_sync(
         job_id: PygeoapiPrefectJobId,
         processor: PygeoapiProcessorProtocol,
-        execution_request: schemas.ExecuteRequest,
+        execution_request: ExecuteRequest,
         output_dir: Path | None,
         prefect_worker_pool: str | None = None,
 ) -> tuple[MediaType, Any, JobStatus]:
@@ -695,8 +529,8 @@ def execute_prefect_processor(
         job_id: PygeoapiPrefectJobId,
         processor: BasePrefectProcessor,
         chosen_mode: ProcessExecutionMode,
-        execution_request: schemas.ExecuteRequest,
-) -> schemas.JobStatusInfoInternal:
+        execution_request: ExecuteRequest,
+) -> JobStatusInfoInternal:
     """Execute a prefect-based pygeoapi processor.
 
     Execution is performed in one of three ways:

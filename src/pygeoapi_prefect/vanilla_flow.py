@@ -5,12 +5,18 @@ it be importable by the Prefect worker as a script.
 """
 import os
 from pathlib import Path
-from typing import Any
 
-from prefect import flow
+from prefect import (
+    flow,
+    task,
+)
 from prefect.runtime import flow_run
 from pygeoapi.process.manager.base import get_manager
 from pygeoapi.util import yaml_load
+
+
+def get_deployment_name(processor_id: str) -> str:
+    return f"pygeoapi-{processor_id}-local"
 
 
 def generate_flow_run_name():
@@ -18,17 +24,36 @@ def generate_flow_run_name():
     return f"pygeoapi_job_{pygeoapi_job_id}"
 
 
-@flow(persist_result=True, log_prints=True)
-def run_vanilla_processor(
+@task(
+    persist_result=True,
+    result_storage_key="{parameters[pygeoapi_job_id]}.pickle",
+    log_prints=True,
+)
+def execute_processor(
         processor_id: str,
-        data_: dict,
-        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs
+        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs and storage results
+        inputs: dict,
         outputs: dict | None = None,
-) -> tuple[str, Any]:
+):
     config_path = Path(os.environ["PYGEOAPI_CONFIG"])
     with config_path.open() as fh:
         config = yaml_load(fh)
     manager = get_manager(config)
     processor = manager.get_processor(processor_id)
-    processor_output_media_type, processor_output = processor.execute(data_, outputs)
+    processor_output_media_type, processor_output = processor.execute(inputs, outputs)
     return processor_output_media_type, processor_output
+
+
+@flow()
+def run_vanilla_processor(
+        processor_id: str,
+        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs
+        inputs: dict,
+        outputs: dict | None = None,
+) -> None:
+    execute_processor(
+        processor_id=processor_id,
+        pygeoapi_job_id=pygeoapi_job_id,
+        inputs=inputs,
+        outputs=outputs,
+    )

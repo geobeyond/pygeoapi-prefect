@@ -1,7 +1,7 @@
 # Installation
 
 In time, this project will be available in the python package index (AKA pypi) and be installable via pip, but for
-now you can install it by git cloning and then using uv to install
+now you can install it by git cloning and then using [uv](https://docs.astral.sh/uv/) to install
 
 ```shell
 git clone https://github.com/geobeyond/pygeoapi-prefect.git

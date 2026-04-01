@@ -5,7 +5,7 @@ import enum
 from typing import (
     Annotated,
     Any,
-    Union,
+    NewType,
 )
 
 import pydantic
@@ -17,12 +17,28 @@ from pygeoapi.util import (
     Subscriber,
 )
 
+MediaType = NewType("MediaType", str)
+ProcessId = NewType("ProcessId", str)
+ResponseHeaders = NewType("ResponseHeaders", dict[str, str])
+JobOutputs = str | dict | list | bytes
+
+
+class PygeoapiPrefectJobId(str):
+    FLOW_RUN_NAME_PREFIX = "pygeoapi_job_"
+
+    def to_flow_run_name(self) -> str:
+        return f"{self.FLOW_RUN_NAME_PREFIX}{self}"
+
+    @classmethod
+    def from_flow_run_name(cls, flow_run_name: str) -> "PygeoapiPrefectJobId":
+        return cls(flow_run_name.replace(cls.FLOW_RUN_NAME_PREFIX, ""))
+
 
 class PrefectDeployment(pydantic.BaseModel):
     name: str
-    queue: str
-    storage_block: str | None = None
-    storage_sub_path: str | None = None
+    result_storage_block: str | None
+    result_storage_key_template: str
+    queue: str | None = None
 
 
 class Link(pydantic.BaseModel):
@@ -270,28 +286,13 @@ class ExecutionSubscriber(pydantic.BaseModel):
 
 
 class ExecuteRequest(pydantic.BaseModel):
-    """Models the `execute.yml` schema defined in OAPIP."""
 
     model_config = pydantic.ConfigDict(use_enum_values=True)
     inputs: dict[str, Any] | None = None
-    # inputs: dict[
-    #     str,
-    #     Union[
-    #         ExecutionInputValueNoObject,
-    #         ExecutionQualifiedInputValue,
-    #         Link,
-    #         list[
-    #             Union[
-    #                 ExecutionInputValueNoObject,
-    #                 ExecutionQualifiedInputValue,
-    #                 Link,
-    #             ]
-    #         ],
-    #     ],
-    # ] | None = None
     outputs: dict[str, ExecutionOutput] | None = None
     response: RequestedResponse | None = RequestedResponse.raw
     subscriber: Subscriber | None = None
+    deployment_info: PrefectDeployment
 
 
 class OutputExecutionResultInternal(pydantic.BaseModel):
