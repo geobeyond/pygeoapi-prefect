@@ -7,14 +7,14 @@ edit_uri: edit/main/docs/
 
 nav:
   - Home: 'index.md'
-  - New User Guide: 'guide.md'
-  - User Guide:
-      - Installation: 'user-guide/installation.md'
-      - Defining processes: 'user-guide/defining-processes.md'
-      - Running prefect: 'user-guide/prefect.md'
-      - Deployments: 'user-guide/deployments.md'
-      - Executing processes: 'user-guide/executing-processes.md'
-      - Complete example: 'user-guide/complete-example.md'
+  - User Guide: 'user-guide.md'
+  # - User Guide:
+    # - Installation: 'user-guide/installation.md'
+    # - Defining processes: 'user-guide/defining-processes.md'
+    # - Running prefect: 'user-guide/prefect.md'
+    # - Deployments: 'user-guide/deployments.md'
+    # - Executing processes: 'user-guide/executing-processes.md'
+    # - Complete example: 'user-guide/complete-example.md'
   - Development: 'development.md'
 
 theme:
@@ -27,6 +27,7 @@ theme:
     - content.tabs.link
     - header.autohide
     - navigation.footer
+    - navigation.indexes
     - navigation.tabs
     - navigation.tabs.sticky
 

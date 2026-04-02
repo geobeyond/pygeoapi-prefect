@@ -45,12 +45,7 @@ def deploy_processors_locally(
                 )
                 continue
             case BaseProcessor():
-                configured_flow = vanilla_flow.run_vanilla_processor.with_options(
-                    name=processor.metadata["id"],
-                    version=processor.metadata.get("version"),
-                    flow_run_name=vanilla_flow.generate_flow_run_name,
-                    validate_parameters=True,
-                )
+                configured_flow = vanilla_flow.get_processor_as_flow(processor)
                 flow_deployment = configured_flow.to_deployment(
                     name=vanilla_flow.get_deployment_name(processor_id),
                     parameters={"processor_id": processor_id},

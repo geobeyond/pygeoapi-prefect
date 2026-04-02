@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 # User guide
 
 ## Installation
@@ -68,6 +73,25 @@ server:
   manager:
     name: pygeoapi_prefect.PrefectManager
 ```
+
+#### Prefect manager configuration
+
+The Prefect Manager accepts the following configuration parameters, all of which are optional.
+These should be specified as properties of the `server.manager` object:
+
+-  `use_vanilla_processor_deployments: bool = True` - Whether to call native pygeoapi processors via the 
+   Prefect deployment interface. If this is enabled (which is the default):
+
+    - Jobs are executed via the Prefect worker, which you must start (as mentioned below)
+    - Jobs are coordinated by the Prefect scheduler, which means that they may not start immediately
+    - Jobs are run in a different process than pygeoapi
+    - This means that job execution is slower, as there is a temporal overhead which is introduced by
+      the coordination that happens between the Prefect scheduler service and the Prefect worker
+  
+    If this is disabled, then jobs are executed immediately and run in the same process as pygeoapi
+
+- `sync_job_execution_timeout_seconds: int = 60` - How much time to give a sync job to finish its 
+  processing before declaring it as failed
 
 
 #### Processors

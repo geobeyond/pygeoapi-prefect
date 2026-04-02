@@ -2,7 +2,6 @@
 
 import copy
 import importlib
-import json
 import logging
 import uuid
 from collections.abc import (
@@ -18,11 +17,9 @@ from typing import (
 import httpx
 import jsonschema.exceptions
 import jsonschema.validators
-from prefect import flow
 from prefect.blocks.core import Block
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
-from prefect.exceptions import MissingResult
 from prefect.results import (
     ResultRecord,
     ResultStore,
@@ -102,6 +99,7 @@ class PrefectManager:
     _processor_configurations: dict[ProcessId, dict[str, Any]]
 
     is_async: bool = True
+    use_vanilla_processor_deployments: bool
     supports_subscribing: bool
     prefect_state_map = {
         StateType.SCHEDULED: JobStatus.accepted,
@@ -120,6 +118,9 @@ class PrefectManager:
     sync_job_execution_timeout_seconds: int
 
     def __init__(self, manager_def: dict[str, Any]):
+        self.use_vanilla_processor_deployments = manager_def.get(
+            "use_vanilla_processor_deployments", True)
+        # self.use_vanilla_processor_deployments = False
         self.name = ".".join(
             (self.__class__.__module__, self.__class__.__qualname__)
         )
@@ -322,6 +323,15 @@ class PrefectManager:
         if execution_mode == RequestedProcessExecutionMode.respond_async:
             chosen_mode = ProcessExecutionMode.async_execute
             response_headers["Preference-Applied"] = RequestedProcessExecutionMode.respond_async.value
+        if isinstance(requested_outputs, Sequence) and not isinstance(requested_outputs, str):
+            outs = {out_name: ExecutionOutput() for out_name in requested_outputs}
+        elif isinstance(requested_outputs, Mapping):
+            outs = {
+                out_name: ExecutionOutput(**out_info)
+                for out_name, out_info in requested_outputs.items()
+            }
+        else:
+            outs = None
 
         match processor := self.get_processor(process_id):
             case BasePrefectProcessor():
@@ -334,15 +344,7 @@ class PrefectManager:
                 )
             case _:
                 raise ProcessError(f"Unknown processor type {type(processor)!r}")
-        if isinstance(requested_outputs, Sequence) and not isinstance(requested_outputs, str):
-            outs = {out_name: ExecutionOutput() for out_name in requested_outputs}
-        elif isinstance(requested_outputs, Mapping):
-            outs = {
-                out_name: ExecutionOutput(**out_info)
-                for out_name, out_info in requested_outputs.items()
-            }
-        else:
-            outs = None
+
         execution_request = ExecuteRequest(
             deployment_info=deployment_info,
             inputs=data_,
@@ -351,8 +353,15 @@ class PrefectManager:
             subscriber=subscriber,
         )
         if chosen_mode == ProcessExecutionMode.sync_execute:
-            media_type, generated_output = self._execute_job_sync(
-                job_id, processor, execution_request)
+            if isinstance(processor, BaseProcessor) and not self.use_vanilla_processor_deployments:
+                print(f"Executing processor {processor.metadata['id']!r} in-process...")
+                media_type, generated_output = _execute_job_sync_without_deployment(
+                    job_id, processor, execution_request
+                )
+            else:
+                print(f"Executing processor {processor.metadata['id']!r} via Prefect deployment...")
+                media_type, generated_output = self._execute_job_sync(
+                    job_id, processor, execution_request)
             print(f"{media_type=}")
             print(f"{generated_output=}")
             return job_id, media_type, generated_output, JobStatus.successful, response_headers
@@ -464,3 +473,29 @@ def _retrieve_result_from_prefect(
     media_type = MediaType(result_record.result[0])
     generated_output = result_record.result[1]
     return media_type, generated_output
+
+
+def _execute_job_sync_without_deployment(
+        job_id: PygeoapiPrefectJobId,
+        processor: BaseProcessor,
+        execution_request: ExecuteRequest,
+) -> tuple[MediaType, Any]:
+    """Execute a job in sync mode by calling a flow directly
+
+    This execution mode is only suitable for:
+
+    - flows that wrap vanilla pygeoapi processors
+    - flows whose source code is reachable in the same process
+      as this one
+    """
+    configured_flow = vanilla_flow.get_processor_as_flow(processor)
+    configured_flow(
+        processor.metadata["id"],
+        job_id,
+        execution_request.inputs,
+        execution_request.outputs
+    )
+    return _retrieve_result_from_prefect(
+        result_storage_block=execution_request.deployment_info.result_storage_block,
+        result_storage_key_template=execution_request.deployment_info.result_storage_key_template
+    )

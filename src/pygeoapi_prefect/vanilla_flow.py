@@ -7,12 +7,23 @@ import os
 from pathlib import Path
 
 from prefect import (
+    Flow,
     flow,
     task,
 )
 from prefect.runtime import flow_run
 from pygeoapi.process.manager.base import get_manager
+from pygeoapi.process.base import BaseProcessor
 from pygeoapi.util import yaml_load
+
+
+def get_processor_as_flow(processor: BaseProcessor) -> Flow:
+    return run_vanilla_processor.with_options(
+        name=processor.metadata["id"],
+        version=processor.metadata.get("version"),
+        flow_run_name=generate_flow_run_name,
+        validate_parameters=True,
+    )
 
 
 def get_deployment_name(processor_id: str) -> str:
