@@ -99,7 +99,7 @@ class PrefectManager:
     _processor_configurations: dict[ProcessId, dict[str, Any]]
 
     is_async: bool = True
-    use_vanilla_processor_deployments: bool
+    use_deployment_for_sync_requests: bool
     supports_subscribing: bool
     prefect_state_map = {
         StateType.SCHEDULED: JobStatus.accepted,
@@ -118,9 +118,8 @@ class PrefectManager:
     sync_job_execution_timeout_seconds: int
 
     def __init__(self, manager_def: dict[str, Any]):
-        self.use_vanilla_processor_deployments = manager_def.get(
-            "use_vanilla_processor_deployments", True)
-        # self.use_vanilla_processor_deployments = False
+        self.use_deployment_for_sync_requests = manager_def.get(
+            "use_deployment_for_sync_requests", False)
         self.name = ".".join(
             (self.__class__.__module__, self.__class__.__qualname__)
         )
@@ -353,7 +352,7 @@ class PrefectManager:
             subscriber=subscriber,
         )
         if chosen_mode == ProcessExecutionMode.sync_execute:
-            if isinstance(processor, BaseProcessor) and not self.use_vanilla_processor_deployments:
+            if isinstance(processor, BaseProcessor) and not self.use_deployment_for_sync_requests:
                 print(f"Executing processor {processor.metadata['id']!r} in-process...")
                 media_type, generated_output = _execute_job_sync_without_deployment(
                     job_id, processor, execution_request

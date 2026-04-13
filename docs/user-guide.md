@@ -7,7 +7,7 @@ hide:
 
 ## Installation
 
-In time, this will be on the [Python Package Index]() but for now you need to use the 
+In time, this will be on the [Python Package Index]() but for now you need to use the
 repository url to get it:
 
 === "uv"
@@ -41,7 +41,7 @@ In order to work with pygeoapi-prefect, you need to set up:
 
 ### Prefect server
 
-After installation, you need to have a Prefect server running and to set some environment variables 
+After installation, you need to have a Prefect server running and to set some environment variables
 so that the Prefect Manager is able to communicate with it.
 
 As the most basic setup, just start a local Prefect server
@@ -64,7 +64,7 @@ As the most basic setup, just start a local Prefect server
 
 ### Pygeoapi
 
-Enable the Prefect job/process manager by modifying your pygeoapi configuration file. The 
+Enable the Prefect job/process manager by modifying your pygeoapi configuration file. The
 `server.manager.name` configuration parameter needs to be set to `pygeopai_prefect.PrefectManager`.
 
 ```yaml
@@ -79,25 +79,25 @@ server:
 The Prefect Manager accepts the following configuration parameters, all of which are optional.
 These should be specified as properties of the `server.manager` object:
 
--  `use_vanilla_processor_deployments: bool = True` - Whether to call native pygeoapi processors via the 
-   Prefect deployment interface. If this is enabled (which is the default):
+-  `use_deployment_for_sync_requests: bool = False` - Whether to call native pygeoapi processors via the
+   Prefect deployment interface or not. If this is enabled:
 
-    - Jobs are executed via the Prefect worker, which you must start (as mentioned below)
+    - Jobs are executed via the Prefect worker, which you must have started beforehand (as mentioned below)
     - Jobs are coordinated by the Prefect scheduler, which means that they may not start immediately
     - Jobs are run in a different process than pygeoapi
-    - This means that job execution is slower, as there is a temporal overhead which is introduced by
+    - This means that job execution is slower, as there is a temporal overhead that is introduced by
       the coordination that happens between the Prefect scheduler service and the Prefect worker
-  
+
     If this is disabled, then jobs are executed immediately and run in the same process as pygeoapi
 
-- `sync_job_execution_timeout_seconds: int = 60` - How much time to give a sync job to finish its 
+- `sync_job_execution_timeout_seconds: int = 60` - How much time to give a sync job to finish its
   processing before declaring it as failed
 
 
 #### Processors
 
-In addition to the manager, you must configure pygeoapi with some resources of type `process`. 
-`PrefectManager` is able to work both with vanilla pygeoapi processors and with a custom Prefect-aware 
+In addition to the manager, you must configure pygeoapi with some resources of type `process`.
+`PrefectManager` is able to work both with vanilla pygeoapi processors and with a custom Prefect-aware
 processor type.
 
 
@@ -122,7 +122,7 @@ TBD
 
 #### Launching pygeoapi
 
-When starting pygeoapi, ensure the `PREFECT_API_URL` environment variable is set. As the most basic 
+When starting pygeoapi, ensure the `PREFECT_API_URL` environment variable is set. As the most basic
 launch of pygeoapi, you can create a `pygeoapi.env` file with these contents:
 
 ```shell
@@ -154,14 +154,14 @@ And then launch pygeoapi:
     ```
 
 This shall start the pygeoapi server, with an instance of `PrefectManager` as its process/job manager, and
-using the Prefect server that is specified by the `PREFECT_API_URL` environment variable. It 
+using the Prefect server that is specified by the `PREFECT_API_URL` environment variable. It
 can now be used with both vanilla pygeoapi processes and a new kind of Prefect-aware processors.
 
 
 ### Prefect worker(s)
 
-The Prefect server dispatches execution to workers, which means you also need to have at least a Prefect 
-worker up and running. There are many ways to set up a Prefect worker, depending on the chosen 
+The Prefect server dispatches execution to workers, which means you also need to have at least a Prefect
+worker up and running. There are many ways to set up a Prefect worker, depending on the chosen
 execution model.
 
 #### Run pygeoapi vanilla processes locally
@@ -187,20 +187,20 @@ running a process
 
 #### Other execution models
 
-Prefect is a very flexible platform and is able to coordinate the execution of processes in different 
+Prefect is a very flexible platform and is able to coordinate the execution of processes in different
 environments, such as remote hosts, docker containers, k8s pods, etc. In order to take advantage of these
 other execution models you will need to both:
 
 - Configure your infrastructure
 - Deploy your processor code using [Prefect deployments](https://docs.prefect.io/v3/concepts/deployments)
-- Create pygeoapi processes that inherit from the custom pygeoapi-prefect `BasePrefectProcessor` and 
+- Create pygeoapi processes that inherit from the custom pygeoapi-prefect `BasePrefectProcessor` and
   set them up accordingly in the pygeoapi configuration
 
 
 !!! NOTE
 
     The `PrefectManager` only interacts with the Prefect server and with the Prefect result storage. This means
-    that as long as you define a Prefect Flow and are able to deploy it, then it 
+    that as long as you define a Prefect Flow and are able to deploy it, then it
 
 
 
