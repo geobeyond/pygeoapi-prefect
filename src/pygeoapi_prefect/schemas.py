@@ -174,7 +174,7 @@ class ProcessOutput(pydantic.BaseModel):
     title: str | None = None
     description: str | None = None
     # schema_: Annotated[ProcessIOSchema, pydantic.Field(alias="schema")]
-    schema_: Annotated[dict[str, Any], pydantic.Field(alias="schema")]
+    schema_: Annotated[dict[str, Any], pydantic.Field(serialization_alias="schema")]
 
 
 class ProcessMetadata(pydantic.BaseModel):
@@ -191,13 +191,16 @@ class AdditionalProcessIOParameters(ProcessMetadata):
 class ProcessInput(ProcessOutput):
     keywords: list[str] | None = None
     metadata: list[ProcessMetadata] | None = None
-    min_occurs: Annotated[int, pydantic.Field(alias="minOccurs")] = 1
-    max_occurs: Annotated[int | str | None, pydantic.Field(alias="maxOccurs")] = 1
+    min_occurs: Annotated[int, pydantic.Field(serialization_alias="minOccurs")] = 1
+    max_occurs: Annotated[
+        int | str | None, pydantic.Field(serialization_alias="maxOccurs")
+    ] = 1
     additional_parameters: AdditionalProcessIOParameters | None = None
 
 
 JobControlOptions = Annotated[
-    list[ProcessJobControlOption], pydantic.Field(alias="jobControlOptions")]
+    list[ProcessJobControlOption], pydantic.Field(alias="jobControlOptions")
+]
 
 
 class InternalProcessDescription(pydantic.BaseModel):
@@ -210,11 +213,11 @@ class InternalProcessDescription(pydantic.BaseModel):
     # prefect-enabled processors can always run in either sync or async fashion
     job_control_options: JobControlOptions = [
         ProcessJobControlOption.SYNC_EXECUTE,
-        ProcessJobControlOption.ASYNC_EXECUTE
+        ProcessJobControlOption.ASYNC_EXECUTE,
     ]
     output_transmission: Annotated[
         list[ProcessOutputTransmissionMode] | None,
-        pydantic.Field(alias="outputTransmission")
+        pydantic.Field(alias="outputTransmission"),
     ] = [ProcessOutputTransmissionMode.VALUE]
     links: list[Link] | None = None
     inputs: dict[str, ProcessInput]
@@ -258,6 +261,8 @@ class ExecutionFormat(pydantic.BaseModel):
     media_type: Annotated[str | None, pydantic.Field(alias="mediaType")] = None
     encoding: str | None = None
     schema_: Annotated[str | dict | None, pydantic.Field(alias="schema")] = None
+
+
 #
 #
 # class ExecutionQualifiedInputValue(pydantic.BaseModel):
@@ -275,7 +280,7 @@ class ExecutionOutput(pydantic.BaseModel):
     format_: Annotated[ExecutionFormat | None, pydantic.Field(alias="format")] = None
     transmission_mode: Annotated[
         ProcessOutputTransmissionMode | None, pydantic.Field(alias="transmissionMode")
-    ] = ProcessOutputTransmissionMode.VALUE.value
+    ] = ProcessOutputTransmissionMode.VALUE
 
 
 class ExecutionSubscriber(pydantic.BaseModel):
@@ -287,7 +292,6 @@ class ExecutionSubscriber(pydantic.BaseModel):
 
 
 class ExecuteRequest(pydantic.BaseModel):
-
     model_config = pydantic.ConfigDict(use_enum_values=True)
     inputs: dict[str, Any] | None = None
     outputs: dict[str, ExecutionOutput] | None = None
@@ -303,7 +307,9 @@ class OutputExecutionResultInternal(pydantic.BaseModel):
 
 class JobStatusInfo(pydantic.BaseModel):
     processor_metadata: dict
-    type_: Annotated[Literal["process"], pydantic.Field(serialization_alias="type")] = "process"
+    type_: Annotated[Literal["process"], pydantic.Field(serialization_alias="type")] = (
+        "process"
+    )
     job_id: Annotated[str, pydantic.Field(serialization_alias="jobID")]
     status: JobStatus
     message: str | None = None
@@ -324,20 +330,24 @@ class JobStatusInfo(pydantic.BaseModel):
             "finished": self.finished,
             "identifier": self.job_id,
             "message": self.message,
-            "mimetype": output_media_types[0],  # pygeoapi only supports a single output per processor
+            "mimetype": output_media_types[
+                0
+            ],  # pygeoapi only supports a single output per processor
             "parameters": self.execution_parameters,
             "process_id": self.processor_metadata["id"],
             "progress": self.progress,
             "started": self.started,
             "status": self.status.name,
             "type": self.type_,
-            "updated": self.updated
+            "updated": self.updated,
         }
 
 
 class JobStatusInfoBase(pydantic.BaseModel):
-    job_id: Annotated[str, pydantic.Field(alias="jobID")]
-    process_id: Annotated[str | None, pydantic.Field(alias="processID")] = None
+    job_id: Annotated[str, pydantic.Field(serialization_alias="jobID")]
+    process_id: Annotated[
+        str | None, pydantic.Field(serialization_alias="processID")
+    ] = None
     status: JobStatus
     message: str | None = None
     created: dt.datetime | None = None

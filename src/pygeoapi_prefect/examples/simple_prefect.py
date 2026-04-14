@@ -16,7 +16,6 @@ from pygeoapi_prefect.schemas import (
     JobStatusInfoInternal,
     InternalProcessDescription,
     ProcessInput,
-    ProcessJobControlOption,
     ProcessOutput,
     OutputExecutionResultInternal,
 )
@@ -54,8 +53,8 @@ def simple_flow(
         result_path = f"{job_id}/output-result.txt"
         file_system.write_path(result_path, result_value.encode("utf-8"))
         return JobStatusInfoInternal(
-            jobID=job_id,
-            processID=process_description.id,
+            job_id=job_id,
+            process_id=process_description.id,
             status=JobStatus.successful,
             generated_outputs={
                 "result": OutputExecutionResultInternal(
@@ -81,19 +80,19 @@ class SimpleFlowProcessor(BasePrefectProcessor):
             "name": ProcessInput(
                 title="Name",
                 description="Some name you think is cool. It will be echoed back.",
-                schema={"type": "string"},
+                schema_={"type": "string"},
                 keywords=["cool-name"],
             ),
             "message": ProcessInput(
                 title="Message",
                 description="An optional additional message to be echoed to the world",
-                schema={"type": "string"},
-                minOccurs=0,
+                schema_={"type": "string"},
+                min_occurs=0,
             ),
         },
         outputs={
             "result": ProcessOutput(
-                schema={
+                schema_={
                     "type": "string",
                     "contentMediaType": "text/plain",
                 },

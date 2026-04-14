@@ -18,8 +18,8 @@ server:
     url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
     attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
   manager:
-    name: pygeoapi_prefect.manager.PrefectManager
-    use_deployment_for_sync_requests: true
+    name: pygeoapi_prefect.PrefectManager
+    # use_deployment_for_sync_requests: false
     # name: TinyDB
     # connection: /tmp/pygeoapi-process-manager.db
     output_dir: /tmp/

@@ -13,9 +13,9 @@ class BasePrefectProcessor(abc.ABC):
     pygeoapi_resource_id: str
 
     def __init__(
-            self,
-            pygeoapi_resource_id: str,
-            deployment_info: schemas.PrefectDeployment,
+        self,
+        pygeoapi_resource_id: str,
+        deployment_info: schemas.PrefectDeployment,
     ) -> None:
         """Instantiate a prefect processor."""
         self.pygeoapi_resource_id = pygeoapi_resource_id
@@ -23,22 +23,20 @@ class BasePrefectProcessor(abc.ABC):
 
     @classmethod
     def from_pygeoapi_conf(
-            cls,
-            resource_id: str,
-            resource_configuration: dict
+        cls, resource_id: str, resource_configuration: dict
     ) -> "BasePrefectProcessor":
         return cls(
             pygeoapi_resource_id=resource_id,
             deployment_info=schemas.PrefectDeployment(
-                **resource_configuration["prefect"]["deployment"])
+                **resource_configuration["prefect"]["deployment"]
+            ),
         )
 
     @property
     def metadata(self) -> dict[str, Any]:
         return {
             "id": self.pygeoapi_resource_id,
-            **self.process_description.model_dump(
-                exclude_none=True, by_alias=True)
+            **self.process_description.model_dump(exclude_none=True, by_alias=True),
         }
 
     @property
@@ -54,9 +52,7 @@ class BasePrefectProcessor(abc.ABC):
         pass
 
     def execute(
-            self,
-            data: dict[str, Any],
-            outputs: list[str] | dict[str, Any] | None = None
+        self, data: dict[str, Any], outputs: list[str] | dict[str, Any] | None = None
     ) -> tuple[str, Any]:
         # unused by prefect-based processors
-        pass
+        raise RuntimeError

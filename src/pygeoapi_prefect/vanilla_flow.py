@@ -3,6 +3,7 @@
 Note that this module cannot have any relative imports, as it is intended that
 it be importable by the Prefect worker as a script.
 """
+
 import os
 from pathlib import Path
 
@@ -41,10 +42,10 @@ def generate_flow_run_name():
     log_prints=True,
 )
 def execute_processor(
-        processor_id: str,
-        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs and storage results
-        inputs: dict,
-        outputs: dict | None = None,
+    processor_id: str,
+    pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs and storage results
+    inputs: dict,
+    outputs: dict | None = None,
 ):
     config_path = Path(os.environ["PYGEOAPI_CONFIG"])
     with config_path.open() as fh:
@@ -57,10 +58,10 @@ def execute_processor(
 
 @flow()
 def run_vanilla_processor(
-        processor_id: str,
-        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs
-        inputs: dict,
-        outputs: dict | None = None,
+    processor_id: str,
+    pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs
+    inputs: dict,
+    outputs: dict | None = None,
 ) -> None:
     execute_processor(
         processor_id=processor_id,

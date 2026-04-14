@@ -35,6 +35,9 @@ prefect = "pygeoapi_prefect.cli:root"
 [tool.uv.sources]
 pygeoapi = { path = "../../pygeoapi", editable = true }
 
+[tool.ty.analysis]
+allowed-unresolved-imports = ["pygeoapi.**"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -1,7 +1,6 @@
 """Example pygeoapi process"""
 
 from prefect import (
-    Flow,
     flow,
     get_run_logger,
     task,
@@ -19,7 +18,6 @@ from pygeoapi_prefect.schemas import (
     OutputExecutionResultInternal,
     InternalProcessDescription,
     ProcessInput,
-    ProcessJobControlOption,
     ProcessOutput,
 )
 from pygeoapi_prefect.process import BasePrefectProcessor
@@ -84,8 +82,8 @@ def generate_status_info(
     job_id: str, process_id: str, result_path: str, result_media_type: str
 ):
     return JobStatusInfoInternal(
-        jobID=job_id,
-        processID=process_id,
+        job_id=job_id,
+        process_id=process_id,
         status=JobStatus.successful,
         generated_outputs={
             "result": OutputExecutionResultInternal(
@@ -107,19 +105,19 @@ class HiPrefectWorldProcessor(BasePrefectProcessor):
             "name": ProcessInput(
                 title="Name",
                 description="Some name you think is cool. It will be echoed back.",
-                schema={"type": "string"},
+                schema_={"type": "string"},
                 keywords=["cool-name"],
             ),
             "message": ProcessInput(
                 title="Message",
                 description="An optional additional message to be echoed to the world",
-                schema={"type": "string"},
-                minOccurs=0,
+                schema_={"type": "string"},
+                min_occurs=0,
             ),
         },
         outputs={
             "result": ProcessOutput(
-                schema={
+                schema_={
                     "type": "string",
                     "contentMediaType": "text/plain",
                 },

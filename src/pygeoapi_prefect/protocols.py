@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import (
     Any,
     Protocol,
@@ -24,7 +23,6 @@ from .schemas import (
 
 
 class PygeoapiProcessorProtocol(Protocol):
-
     @property
     def name(self) -> str: ...
 
@@ -37,14 +35,11 @@ class PygeoapiProcessorProtocol(Protocol):
     def set_job_id(self, job_id: str) -> None: ...
 
     def execute(
-            self,
-            data_: dict[str, Any],
-            outputs: list[str] | dict[str, Any] | None = None
+        self, data_: dict[str, Any], outputs: list[str] | dict[str, Any] | None = None
     ) -> tuple[str, Any]: ...
 
 
 class PygeoapiProcessManagerProtocol(Protocol):
-
     def __init__(self, manager_def: dict[str, Any]) -> None: ...
 
     @property
@@ -59,24 +54,21 @@ class PygeoapiProcessManagerProtocol(Protocol):
     @property
     def connection(self) -> Any: ...
 
-    @property
-    def output_dir(self) -> Path | None: ...
+    # @property
+    # def output_dir(self) -> Path | None: ...
 
     @property
     def processes(self) -> dict[str, dict[str, Any]]:
         """Return processor configurations known to the manager"""
 
-    def get_processor(
-            self,
-            process_id: ProcessId
-    ) -> PygeoapiProcessorProtocol:
+    def get_processor(self, process_id: ProcessId) -> PygeoapiProcessorProtocol:
         """Instantiate a processor."""
 
     def get_jobs(
-            self,
-            status: JobStatus | None = None,
-            limit: int | None = None,
-            offset: int | None = None
+        self,
+        status: JobStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> dict[str, Any]:
         """Get process-related jobs"""
 
@@ -98,31 +90,26 @@ class PygeoapiProcessManagerProtocol(Protocol):
     def get_job_result(self, job_id: str) -> tuple[MediaType, Any]: ...
 
     def execute_process(
-            self,
-            process_id: ProcessId,
-            data_: dict,
-            execution_mode: RequestedProcessExecutionMode | None = None,
-            requested_outputs: dict[str, Any] | None = None,
-            subscriber: Subscriber | None = None,
-            requested_response: RequestedResponse | None = RequestedResponse.raw.value
+        self,
+        process_id: ProcessId,
+        data_: dict,
+        execution_mode: RequestedProcessExecutionMode | None = None,
+        requested_outputs: dict[str, Any] | None = None,
+        subscriber: Subscriber | None = None,
+        requested_response: RequestedResponse | None = RequestedResponse.raw,
     ) -> tuple[
-        PygeoapiPrefectJobId,
-        MediaType,
-        JobOutputs,
-        JobStatus,
-        ResponseHeaders | None
+        PygeoapiPrefectJobId, MediaType, JobOutputs, JobStatus, ResponseHeaders | None
     ]:
         """Execute a process"""
 
 
 class PygeoapiPrefectFlowProtocol(Protocol):
-
     def __call__(
-            self,
-            *args,
-            job_id: str,
-            result_storage_block: str | None,
-            process_description: InternalProcessDescription,
-            execution_request: ExecuteRequest,
+        self,
+        *args,
+        job_id: str,
+        result_storage_block: str | None,
+        process_description: InternalProcessDescription,
+        execution_request: ExecuteRequest,
     ) -> JobStatusInfoInternal:
         """Protocol that flows must implement in order to be callable from pygeoapi"""
