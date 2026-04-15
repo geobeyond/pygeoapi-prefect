@@ -95,17 +95,6 @@ class PrefectManager:
     enable_async_job_execution: bool
     enable_sync_job_execution: bool
     supports_subscribing: bool
-    prefect_state_map = {
-        StateType.SCHEDULED: JobStatus.accepted,
-        StateType.PENDING: JobStatus.accepted,
-        StateType.RUNNING: JobStatus.running,
-        StateType.COMPLETED: JobStatus.successful,
-        StateType.FAILED: JobStatus.failed,
-        StateType.CANCELLED: JobStatus.dismissed,
-        StateType.CRASHED: JobStatus.failed,
-        StateType.PAUSED: JobStatus.accepted,
-        StateType.CANCELLING: JobStatus.dismissed,
-    }
     name: str
     # connection: Any = None
     # output_dir: Path | None = None
@@ -197,9 +186,7 @@ class PrefectManager:
         """
         logger.debug(f"get_jobs called with {locals()=}")
         if status:
-            prefect_states = [
-                k for k, v in self.prefect_state_map.items() if status == v
-            ]
+            prefect_states = [k for k, v in PREFECT_STATE_MAP.items() if status == v]
         else:
             prefect_states = [
                 StateType.RUNNING,
