@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def root(): ...
 
 
-@root.command(name="deploy-static")
+@root.command(name="deploy-local")
 @click.option("-c", "--pygeoapi-config", type=Path, envvar="PYGEOAPI_CONFIG")
 def deploy_processors_locally(
     pygeoapi_config: Path,

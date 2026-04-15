@@ -70,6 +70,9 @@ resources:
     type: process
     processor:
       name: HelloWorld
+      job_control_options:
+        - sync-execute
+        - async-execute
 
   simple-flow:
     type: process

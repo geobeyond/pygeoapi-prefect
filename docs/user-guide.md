@@ -41,16 +41,12 @@ In order to work with pygeoapi-prefect, you need to set up:
 
 ### Prefect server
 
-After installation, you need to have a Prefect server running and to set some environment variables
-so that the Prefect Manager is able to communicate with it.
-
-As the most basic setup:
-
-generate an env file for configuring Prefect, ensuring that you
+In order to use this project you need to have access to a running and appropriately configured Prefect server.
+As the most basic setup, generate an env file for configuring Prefect, ensuring that you
 enable [persistence of results](https://docs.prefect.io/v3/advanced/results).
 
 ```shell
-cat << EOF > prefect-env.env
+cat << EOF > prefect-server.env
 PREFECT_API_URL=http://127.0.0.1:4200/api
 PREFECT_RESULTS_PERSIST_BY_DEFAULT=true
 EOF
@@ -61,17 +57,31 @@ Then start a local Prefect server
 === "uv"
 
     ```shell
+    # export the variables defined in the prefect-server.env file
+    set -o allexport; source prefect-env.env; set +o allexport
+
     uv run prefect server start
     ```
 
 === "pip"
 
     ```shell
+    # export the variables defined in the prefect-server.env file
+    set -o allexport; source prefect-env.env; set +o allexport
+
     prefect server start
     ```
 
    This will start up a local Prefect server listening on port 4200. The Prefect UI becomes available at
    `http://localhost:4200`
+
+
+#### Prefect server configuration
+
+- Result persistence
+- Worker types
+- Concurrency limits
+- Etc.
 
 
 ### Pygeoapi
@@ -86,70 +96,25 @@ server:
     name: pygeoapi_prefect.PrefectManager
 ```
 
-#### Prefect manager configuration
+#### Pygeoapi Prefect manager configuration
 
 The Prefect Manager accepts the following configuration parameters, all of which are optional.
 These should be specified as properties of the `server.manager` object:
 
-- `enable_sync_job_execution: bool = False` - Whether to accept execution requests that run synchronously.
+-   `enable_async_job_execution: bool = True` - Whether to allow executing jobs in async mode. This is enabled by
+    default and is the recommended way to operate. Async execution defers the scheduling of processor jobs to the
+    Prefect scheduler, which can have its concurrency levels configured in a way that prevents overloading the server.
 
-    !!! NOTE
+-   `enable_sync_job_execution: bool = False` - Whether to allow executing jobs in sync mode.
 
-        This setting is disabled by default and we recommend keeping it disabled - Executing syncronously risks
-        overloading the server in case a large number of requestes is received.
+    If needed, the configuration of each processor is allowed to override this setting, making it possible to
+    selectively enable sync execution for those processors in which it is a useful execution mode - see below for
+    more details on this
 
-        If needed, the metadata of
-        each processor is allowed to override this setting, making it possible to selectively enable sync
-        execution for those processors in which it is a useful execution mode.
+    !!! WARNING
 
-        #### Controlling processor execution modes via pygeoapi config
-
-        By default, pygeoapi does not allow modying a processor's metadata in its configuration and assumes that
-        all parameters are to be set together with the processor code. This has the disadvantage of making it
-        impossible to toggle a processor's support for sync execution on and off without modifying the source code.
-        In order to ease configuration, `PrefectManager` will look for a `job_control_options` configuration key on
-        its own configuration file, which has the same meaning as the `jobControlOptions` metadata key, _i.e._ it
-        should be a list of strings with at least one entry and can contain `sync-execute` and `async-execute` entries.
-
-        In the following example we disable sync mode in the manager but re-enable it in the `hello-world`
-        processor configuration:
-
-        ```yaml
-        # pygeoapi configuration file
-        server:
-          manager:
-            name: pygeoapi_prefect.PrefectManager
-            enable_sync_job_execution: false
-        resources:
-          hello-world:
-            type: process
-            processor:
-              name: HelloWorld
-              job_control_options:
-                - sync-execute
-        ```
-
-
-- `enable_async_job_execution: bool = True` - Whether to accept execution requests that run asynchronously.
-  This is enabled by default and is the recommended way to operate. Async execution defers the scheduling of
-  processor execution to the Prefect scheduler, allowing for more stable operation, as the scheduler can control
-  when to execute jobs depending on the load. Similarly to the previous parameter, this can also be
-  overridden on a per-processor basis.
-
--  `use_deployment_for_sync_requests: bool = False` - Whether to call native pygeoapi processors via the
-   Prefect deployment interface or not. If this is enabled:
-
-    - Jobs are executed via the Prefect worker, which you must have started beforehand (as mentioned below)
-    - Jobs are coordinated by the Prefect scheduler, which means that they may not start immediately
-    - Jobs are run in a different process than pygeoapi
-    - This means that job execution is slower, as there is a temporal overhead that is introduced by
-      the coordination that happens between the Prefect scheduler service and the Prefect worker
-
-    If this is disabled (the default), then jobs are executed immediately and run in the same process as
-    pygeoapi.
-
-    Note that regardless of this being enabled or not, all pygeoapi processes execution requests are tracked by
-    Prefect and can be monitored using the Prefect UI.
+        This setting is disabled by default and we recommend keeping it disabled - Executing synchronously risks
+        overloading the server in case a large number of requests is received.
 
 - `sync_job_execution_timeout_seconds: int = 60` - How much time to give a sync job to finish its
   processing before declaring it as failed
@@ -162,9 +127,9 @@ In addition to the manager, you must configure pygeoapi with some resources of t
 processor type.
 
 
-##### pygeoapi vanilla processes
+##### Vanilla pygeoapi processors
 
-Vanilla pygeoapi processes (_i.e._ those that inherit from `pygeoapi.process.base.BaseProcessor`) can be used without
+Vanilla pygeoapi processors (_i.e._ those that inherit from `pygeoapi.process.base.BaseProcessor`) can be used without
 any modification. As usual, processes need to be specified in the pygeoapi configuration file. Example:
 
 ```yaml
@@ -181,41 +146,7 @@ is able to execute them by generating Prefect flow runs whenever an execution re
 either sync or async, as both types are supported by the Prefect manager.
 
 
-###### Sync execution
-
-Whenever pygeoapi receives a sync processor execution request, such as:
-
-```shell
-curl \
-    -X POST \
-    "http://localhost:5000/processes/hello-world/execution" \
-    -H "Content-Type: application/json" \
-    -d '{"inputs": {"name": "Joe"}}'
-```
-
-This is turned into a Prefect flow run and is executed locally, in the same process as pygeoapi. In other words,
-the pygeoapi processor is wrapped as a Prefect flow and is run by the Prefect manager, using regular function calls.
-
-Being managed by Prefect, this means.
-
-
-###### Async execution
-
-When pygeoapi receives an async processor execution request, such as:
-
-```shell
-curl \
-    -X POST \
-    "http://localhost:5000/processes/hello-world/execution" \
-    -H "Content-Type: application/json" \
-    -H "Prefer: respond-async" \
-    -d '{"inputs": {"name": "Joe"}}'
-```
-
-This is turned into a Prefect flow and is executed via the respective processor deployment
-
-
-##### custom prefect-aware processes
+##### custom prefect-aware processors
 
 If you prefer, you can write Prefect flows, deploy them using any of the multiple techniques supported by Prefect
 and then adapt them to run as pygeoapi processors.
@@ -233,17 +164,48 @@ def my_custom_flow()
 ```
 
 
+##### Controlling processor execution modes via pygeoapi config
+
+By default, pygeoapi does not allow modifying a processor's metadata in its configuration and assumes that
+all parameters are to be set together with the processor code. This has the disadvantage of making it
+impossible to toggle a processor's support for sync execution on and off without modifying the source code.
+
+In order to ease configuration, `PrefectManager` looks for a `job_control_options` configuration key on
+its the pygeoapi configuration file, which has the same meaning as the `jobControlOptions` metadata
+key, _i.e._ it should be a list of strings with at least one entry and can contain `sync-execute` and
+`async-execute` entries.
+
+In the following example we disable sync mode in the manager but re-enable it in the `hello-world`
+processor configuration:
+
+```yaml
+# pygeoapi configuration file
+server:
+  manager:
+    name: pygeoapi_prefect.PrefectManager
+    enable_sync_job_execution: false
+resources:
+  hello-world:
+    type: process
+    processor:
+      name: HelloWorld
+      job_control_options:
+        - sync-execute
+```
+
+
 #### Launching pygeoapi
 
 When starting pygeoapi, ensure the `PREFECT_API_URL` environment variable is set. As the most basic
 launch of pygeoapi, you can create a `pygeoapi.env` file with these contents:
 
 ```shell
-# contents of pygeoapi.env
+
+cat << EOF > pygeoapi.env
 PYGEOAPI_CONFIG=<your-pygeoapi-config.file>
 PYGEOAPI_OPENAPI=<your-pygeoapi-openapi.file>
 PREFECT_API_URL=http://127.0.0.1:4200/api
-PREFECT_RESULTS_PERSIST_BY_DEFAULT=true
+EOF
 ```
 
 And then launch pygeoapi:
@@ -251,7 +213,7 @@ And then launch pygeoapi:
 === "uv"
 
     ```shell
-    # set the contents of pygeoapi.env as environment variables
+    # export the variables defined in the pygeoapi.env file
     set -o allexport; source pygeoapi.env; set +o allexport
 
     uv run pygeoapi serve
@@ -260,54 +222,58 @@ And then launch pygeoapi:
 === "pip"
 
     ```shell
-    # set the contents of pygeoapi.env as environment variables
+    # export the variables defined in the pygeoapi.env file
     set -o allexport; source pygeoapi.env; set +o allexport
 
     pygeoapi serve
     ```
 
-This shall start the pygeoapi server, with an instance of `PrefectManager` as its process/job manager, and
-using the Prefect server that is specified by the `PREFECT_API_URL` environment variable. It
-can now be used with both vanilla pygeoapi processes and a new kind of Prefect-aware processors.
+This will start the pygeoapi server, with `PrefectManager` as its process/job manager, and
+using the Prefect server that is specified by the `PREFECT_API_URL` environment variable.
 
 
 ### Prefect worker(s)
 
-The Prefect server dispatches execution to workers, which means you also need to have at least a Prefect
+When responding to requests that specify async execution mode, `PrefectManager` uses
+[Prefect deployments]. These rely on an additional piece of
+infrastructure, the Prefect worker, which means you also need to have at least a Prefect
 worker up and running. There are many ways to set up a Prefect worker, depending on the chosen
 execution model.
 
-#### Run pygeoapi vanilla processes locally
+#### Run pygeoapi processors locally
 
-For running pygeoapi vanilla processors locally, you can call a custom CLI command to start the worker:
+For running pygeoapi processors locally, you can call a custom CLI command to start the worker:
 
 === "uv"
 
 ```shell
-uv run pygeoapi plugins prefect deploy-static
+uv run pygeoapi plugins prefect deploy-local
 ```
 
 === "pip"
 
 ```shell
-pygeoapi plugins prefect deploy-static
+pygeoapi plugins prefect deploy-local
 ```
 
-This will collect all vanilla processes defined in the pygeoapi configuration file, create a Prefect static
-deployment for each and launch a Prefect worker that spawns new processes whenever it receives a request for
-running a process
+This will collect all processors defined in the pygeoapi configuration file that do not have a `prefect` options key,
+create a Prefect static deployment for each and launch a Prefect worker that spawns new processes whenever it
+receives a request for running a process.
 
 
 #### Other execution models
 
 Prefect is a very flexible platform and is able to coordinate the execution of processes in different
 environments, such as remote hosts, docker containers, k8s pods, etc. In order to take advantage of these
-other execution models you will need to both:
+other execution models, you will need to:
 
-- Configure your infrastructure
-- Deploy your processor code using [Prefect deployments](https://docs.prefect.io/v3/concepts/deployments)
-- Create pygeoapi processes that inherit from the custom pygeoapi-prefect `BasePrefectProcessor` and
+1. Configure your Prefect-related infrastructure
+2. Deploy your processor code using [Prefect deployments]
+3. Create pygeoapi processors that inherit from the custom pygeoapi-prefect `BasePrefectProcessor` and
   set them up accordingly in the pygeoapi configuration
+
+
+[Prefect deployments]: https://docs.prefect.io/v3/concepts/deployments
 
 
 !!! NOTE
@@ -320,6 +286,147 @@ other execution models you will need to both:
 ## Usage
 
 
-### Execute process
+### Execute processes by making OGC API - Processes requests
+
+??? tip "pygeoapi configuration"
+
+    These examples use the below pygeoapi configuration. Notably:
+
+    - `pygeoapi_prefect.PrefectManager` is set as the process/job manager
+    - async execution mode is enabled (it is the default)
+    - sync execution mode is disabled (it is the default)
+    - the `hello-world` process is one of the standard pygeoapi processes. This contains further configuration
+      enabling it to be executed in both sync and async mode, thus overriding the global option set on the manager
+
+    ```yaml
+    server:
+      bind:
+        host: 0.0.0.0
+        port: 5000
+      url: http://localhost:5000
+      mimetype: application/json; charset=UTF-8
+      encoding: utf-8
+      gzip: false
+      languages:
+        - en-US
+      # cors: true
+      pretty_print: true
+      limit: 10
+      map:
+        url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+        attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+      manager:
+        name: pygeoapi_prefect.PrefectManager
+
+    logging:
+      level: DEBUG
+
+    metadata:
+      identification:
+        title:
+          en: pygeoapi default instance
+        description:
+          en: pygeoapi provides an API to geospatial data
+        keywords:
+          en:
+            - geospatial
+        keywords_type: theme
+        terms_of_service: https://creativecommons.org/licenses/by/4.0/
+        url: https://example.org
+      license:
+        name: CC-BY 4.0 license
+        url: https://creativecommons.org/licenses/by/4.0/
+      provider:
+        name: Organization Name
+        url: https://pygeoapi.io
+      contact:
+        name: Lastname, Firstname
+        position: Position Title
+        address: Mailing Address
+        city: City
+        stateorprovince: Administrative Area
+        postalcode: Zip or Postal Code
+        country: Country
+        phone: +xx-xxx-xxx-xxxx
+        fax: +xx-xxx-xxx-xxxx
+        email: you@example.org
+        url: Contact URL
+        hours: Mo-Fr 08:00-17:00
+        instructions: During hours of service. Off on weekends.
+        role: pointOfContact
+
+    resources:
+      hello-world:
+        type: process
+        processor:
+          name: HelloWorld
+          job_control_options:
+            - sync-execute
+            - async-execute
+    ```
+
+#### 1.  Execute a process with the default execution mode
+
+A simple request for execution of the `hello-world` processor looks like this:
+
+```shell
+curl \
+    -sS \
+    -i \
+    -X POST "http://localhost:5000/processes/hello-world/execution" \
+    -H "Content-Type: application/json" \
+    -d '{"inputs": {"name": "Joe"}}'
+```
+
+The response should look like this (some response headers omitted for brevity):
+
+```shell
+HTTP/1.1 200 OK
+Content-Type: application/json
+Preference-Applied: wait
+Location: http://localhost:5000/jobs/157136b1-354b-4dca-87de-c2a8eddd692d
+
+{"id":"echo","value":"Hello Joe!"}
+```
+
+When both execution modes are enabled (as per the pygeoapi configuration file shown above), the Prefect manager
+honors the OGC API - Processes standard, which mentions that sync mode should be used
+([section 7.11.2.3 - Requirement 25, Condition C](https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode)).
+This is reported by the presence of the `Preference-Applied: wait` response header and by the direct inclusion of
+the generated outputs as the body of the response.
+
+
+#### 2.  Explicitly request async execution mode
+
+Including the `Prefer: respond-async` request header causes the Prefect manager to dispatch execution in async
+mode (as long as apropriately configured, as shown above):
+
+```shell
+curl \
+    -sS \
+    -i \
+    -X POST "http://localhost:5000/processes/hello-world/execution" \
+    -H "Content-Type: application/json" \
+    -H "Prefer: respond-async" \
+    -d '{"inputs": {"name": "Joe"}}'
+```
+
+In this case, the response is immediate and includes:
+
+
+#### 3. Explicitly request sync execution mode:
+
+```shell
+curl \
+    -X POST \
+    "http://localhost:5000/processes/hello-world/execution" \
+    -H "Content-Type: application/json" \
+    -H "Prefer: wait" \
+    -d '{"inputs": {"name": "Joe"}}'
+```
+
+
+### Monitor jobs via pygeoapi
+
 
 ### Monitor execution via Prefect UI
