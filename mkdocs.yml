@@ -16,6 +16,8 @@ nav:
     # - Executing processes: 'user-guide/executing-processes.md'
     # - Complete example: 'user-guide/complete-example.md'
   - Development: 'development.md'
+  - Examples:
+    - Run processes inside ephemeral docker containers: 'docker-example.md'
 
 theme:
   name: material

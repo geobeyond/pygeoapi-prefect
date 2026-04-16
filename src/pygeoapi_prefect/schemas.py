@@ -37,7 +37,7 @@ class PygeoapiPrefectJobId(str):
 
 class PrefectDeployment(pydantic.BaseModel):
     name: str
-    result_storage_block: str | None
+    result_storage_block: str | None = None
     result_storage_key_template: str
     queue: str | None = None
 
@@ -174,7 +174,7 @@ class ProcessOutput(pydantic.BaseModel):
     title: str | None = None
     description: str | None = None
     # schema_: Annotated[ProcessIOSchema, pydantic.Field(alias="schema")]
-    schema_: Annotated[dict[str, Any], pydantic.Field(serialization_alias="schema")]
+    schema_: Annotated[dict[str, Any], pydantic.Field(alias="schema")]
 
 
 class ProcessMetadata(pydantic.BaseModel):
@@ -191,10 +191,8 @@ class AdditionalProcessIOParameters(ProcessMetadata):
 class ProcessInput(ProcessOutput):
     keywords: list[str] | None = None
     metadata: list[ProcessMetadata] | None = None
-    min_occurs: Annotated[int, pydantic.Field(serialization_alias="minOccurs")] = 1
-    max_occurs: Annotated[
-        int | str | None, pydantic.Field(serialization_alias="maxOccurs")
-    ] = 1
+    min_occurs: Annotated[int, pydantic.Field(alias="minOccurs")] = 1
+    max_occurs: Annotated[int | str | None, pydantic.Field(alias="maxOccurs")] = 1
     additional_parameters: AdditionalProcessIOParameters | None = None
 
 
@@ -217,7 +215,7 @@ class InternalProcessDescription(pydantic.BaseModel):
     ]
     output_transmission: Annotated[
         list[ProcessOutputTransmissionMode] | None,
-        pydantic.Field(alias="outputTransmission"),
+        pydantic.Field(serialization_alias="outputTransmission"),
     ] = [ProcessOutputTransmissionMode.VALUE]
     links: list[Link] | None = None
     inputs: dict[str, ProcessInput]

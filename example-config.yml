@@ -77,19 +77,36 @@ resources:
   simple-flow:
     type: process
     processor:
-      name: pygeoapi_prefect.examples.simple_prefect.SimpleFlowProcessor
       prefect:
         deployment:
-          name: simple-flow/deployed-simple-flow
-          result_storage_block: remote-file-system/test-sb1
+          name: simple-flow/first-deployment
+          # result_storage_block: remote-file-system/test-sb1
           result_storage_key_template: "{parameters[pygeoapi_job_id]}.pickle"
-
-  hi-prefect-world:
-    type: process
-    processor:
-      name: pygeoapi_prefect.examples.hi_prefect_world.HiPrefectWorldProcessor
-      prefect:
-        deployment:
-          name: hi-prefect-world/deployed-hi-prefect-world
-          result_storage_block: remote-file-system/test-sb1
-          result_storage_key_template: "{parameters[pygeoapi_job_id]}.pickle"
+        metadata:
+          version: 0.0.1
+          title: Hi world prefect example
+          description: >
+            An example processor that is powered by a Prefect deployment.
+          inputs:
+            name:
+              description: Some name you think is cool. It will be used to greet you
+              schema:
+                type: string
+            message:
+              title: My message
+              description: An optional additional message to be echoed
+              schema:
+                type: string
+              minOccurs: 0
+          outputs:
+            result:
+              schema:
+                type: string
+                contentMediaType: text/plain
+          keywords:
+            - processor
+            - prefect
+            - example
+          example:
+            inputs:
+              name: Joe
