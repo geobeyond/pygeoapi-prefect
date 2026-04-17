@@ -12,7 +12,6 @@ from typing import Any
 import httpx
 import jsonschema.exceptions
 import jsonschema.validators
-from prefect.blocks.core import Block
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.results import (
@@ -42,10 +41,7 @@ from . import (
     prefect_client,
     vanilla_flow,
 )
-from .process import (
-    BasePrefectProcessor,
-    PrefectDeploymentProcessor,
-)
+from .process import PrefectDeploymentProcessor
 from .protocols import PygeoapiProcessorProtocol
 from .schemas import (
     ExecutionOutput,
@@ -54,7 +50,6 @@ from .schemas import (
     JobStatusInfoInternal,
     JobStatusInfo,
     MediaType,
-    OutputExecutionResultInternal,
     ProcessId,
     ProcessJobControlOption,
     PygeoapiPrefectJobId,
@@ -261,15 +256,16 @@ class PrefectManager:
                 raise RuntimeError("Job is not completed")
             process_id = ProcessId(prefect_flow.name)
             processor = self.get_processor(process_id)
-            if isinstance(processor, BasePrefectProcessor):
+            print(f"{processor=}")
+            if isinstance(processor, PrefectDeploymentProcessor):
                 return _retrieve_result_from_prefect(
                     result_storage_block=processor.deployment_info.result_storage_block,
-                    result_storage_key_template=processor.deployment_info.result_storage_key_template,
+                    result_storage_key=processor.deployment_info.result_storage_key_template.format(job_id=job_id),
                 )
             else:
                 return _retrieve_result_from_prefect(
                     result_storage_block=None,
-                    result_storage_key_template=f"{job_id}.pickle",
+                    result_storage_key=f"{job_id}.pickle",
                 )
 
     def delete_job(  # type: ignore [empty-body]
@@ -405,27 +401,6 @@ class PrefectManager:
             )
             return job_id, None, None, job_status, response_headers
 
-    def get_output_data_raw(
-        self, generated_output: OutputExecutionResultInternal, process_id: ProcessId
-    ) -> bytes:
-        """Get output data as bytes."""
-        processor = self.get_processor(process_id)
-        if isinstance(processor, BasePrefectProcessor):
-            if (sb := processor.result_storage_block) is not None:
-                file_system = Block.load(sb)
-                result = file_system.read_path(generated_output.location)
-            else:
-                result = super().get_output_data_raw(generated_output, process_id)
-        else:
-            result = super().get_output_data_raw(generated_output, process_id)
-        return result
-
-    def get_output_data_link_href(
-        self, generated_output: OutputExecutionResultInternal, process_id: str
-    ) -> str:
-        # we need to convert internal location into a proper href for a link
-        return super().get_output_data_link_href(generated_output, process_id)
-
     def get_job_status_from_flow_run(
         self, flow_run: FlowRun, prefect_flow: Flow
     ) -> JobStatusInfo:
@@ -446,7 +421,7 @@ class PrefectManager:
 
 def _select_execution_mode(
     requested_mode: RequestedProcessExecutionMode | None,
-    processor: BaseProcessor | BasePrefectProcessor,
+    processor: BaseProcessor | PrefectDeploymentProcessor,
 ) -> ProcessExecutionMode:
     requested = requested_mode or RequestedProcessExecutionMode.wait
     if requested == RequestedProcessExecutionMode.wait:
@@ -476,12 +451,12 @@ def _select_execution_mode(
 
 def _retrieve_result_from_prefect(
     result_storage_block: str | None,
-    result_storage_key_template: str,
+    result_storage_key: str,
 ) -> tuple[MediaType, Any]:
     # defer determination of the result storage to Prefect, in order to allow
     # for external configuration
     result_store = ResultStore(result_storage=result_storage_block)
-    result_record: ResultRecord = result_store.read(result_storage_key_template)
+    result_record: ResultRecord = result_store.read(result_storage_key)
     logger.debug(f"debug {result_record=}")
     print(f"print {result_record=}")
     media_type = MediaType(result_record.result[0])
@@ -510,7 +485,7 @@ def _execute_job_sync_in_process(
     )
     return _retrieve_result_from_prefect(
         result_storage_block=None,
-        result_storage_key_template=f"{job_id}.pickle",
+        result_storage_key=f"{job_id}.pickle",
     )
 
 
@@ -542,7 +517,7 @@ def _execute_job_sync_via_deployment(
         )
     return _retrieve_result_from_prefect(
         result_storage_block=processor.deployment_info.result_storage_block,
-        result_storage_key_template=processor.deployment_info.result_storage_key_template,
+        result_storage_key=processor.deployment_info.result_storage_key_template.format(job_id=job_id),
     )
 
 

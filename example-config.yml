@@ -77,11 +77,13 @@ resources:
   simple-flow:
     type: process
     processor:
+      job_control_options:
+        - sync-execute
+        - async-execute
       prefect:
         deployment:
           name: simple-flow/first-deployment
-          # result_storage_block: remote-file-system/test-sb1
-          result_storage_key_template: "{parameters[pygeoapi_job_id]}.pickle"
+          result_storage_key_template: "{job_id}.pickle"
         metadata:
           version: 0.0.1
           title: Hi world prefect example

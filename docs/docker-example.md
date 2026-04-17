@@ -5,9 +5,19 @@
 Prefect is able to run flows inside ephemeral docker containers.
 This requires that a Prefect work pool be created with the `docker` type:
 
-```shell
-prefect work-pool create --type docker my-pool
-```
+=== "uv"
+
+    ```shell
+    uv run prefect work-pool create --type docker my-pool
+    ```
+
+=== "pip"
+
+    ```shell
+    source .venv/bin/activate
+    
+    prefect work-pool create --type docker my-pool
+    ```
 
 Start a worker that consumes work from this newly-created pool
 
@@ -20,19 +30,28 @@ Start a worker that consumes work from this newly-created pool
 
     === "uv"
 
-    ```shell
-    uv add prefect-docker
-    ```
+        ```shell
+        uv add prefect-docker
+        ```
 
     === "pip"
 
+        ```shell
+        pip install prefect-docker
+        ```
+
+=== "uv"
+
     ```shell
-    pip install prefect-docker
+    uv run prefect worker start --pool my-pool
     ```
 
-```shell
-prefect worker start --pool my-pool
-```
+=== "pip"
+
+    ```shell
+    prefect worker start --pool my-pool
+    ```
+
 
 #### Flow deployment
 
@@ -76,9 +95,17 @@ if __name__ == "__main__":
 
 Deploy it:
 
-```shell
-python simple_flow.py
-```
+=== "uv"
+
+    ```shell
+    uv run python simple_flow.py
+    ```
+
+=== "pip"
+
+    ```shell
+    python simple_flow.py
+    ```
 
 This creates a docker image named `pygeoapi-prefect/flows/simple-flow:{date}` with the flow contents and registers
 a deployment named `simple-flow/first-deployment` with the Prefect server. Because our `simple_flow.deploy()` call
@@ -87,9 +114,17 @@ includes `push=False`, this docker image lives in the local filesystem only.
 You can check the Prefect server UI in order to verify that your deployment is now registered. You can also used the
 Prefect API:
 
-```shell
-prefect deployment ls
-```
+=== "uv"
+
+    ```shell
+    uv run prefect deployment ls
+    ```
+
+=== "pip"
+
+    ```shell
+    prefect deployment ls
+    ```
 
 
 #### Pygeoapi processor configuration

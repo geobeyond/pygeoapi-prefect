@@ -151,15 +151,64 @@ either sync or async, as both types are supported by the Prefect manager.
 If you prefer, you can write Prefect flows, deploy them using any of the multiple techniques supported by Prefect
 and then adapt them to run as pygeoapi processors.
 
-In order to do so, your Prefect flows need to implement the
-[protocol](https://typing.python.org/en/latest/spec/protocol.html)
-defined in `pygeoapi_prefect.PygeoapiPrefectFlowProtocol`
+In order to be runnable via pygeoapi, your flows need to:
+
+1.  Implement the [protocol](https://typing.python.org/en/latest/spec/protocol.html)
+    defined in `pygeoapi_prefect.PygeoapiPrefectFlowProtocol`:
+
+    ```python
+    from typing import Protocol
+
+    class PygeoapiPrefectFlowProtocol(Protocol):
+        def __call__(
+            self,
+            processor_id: str,
+            pygeoapi_job_id: str,
+            inputs: dict,
+            outputs: dict | None = None,
+        ) -> None: ...
+    ```
+  
+2.  The flow must have at least one Prefect task, which is where the processing output is be generated. This task 
+    must return the generated output, which enables it to be managed by 
+    [Prefect's result management facilities](https://docs.prefect.io/v3/advanced/results). This means this 
+    result-generating task must:
+
+    -   Be configured to persist results;
+    -   Be configured with a result storage key that uses the pygeoapi job id - this is needed in order to ensure 
+        pygeoapi is able to reconstruct the result's storage key for retrieval;
+    -   The generated output must be a two-element tuple where the first element is the media type and the second 
+        element is the actual output.
+
+3.  The flow must already have been deployed in your Prefect environment. You can use any of the Prefect deployment 
+    types (local processes, docker containers, k8s, etc.). Check the [examples](docker-example.md) section for more information
+
+4.  Your pygeoapi configuration for the process needs to include a `prefect` section, with `deployment` and `metadata` 
+    sub-sections.
+
+This means that a very minimal flow looks like this:
 
 ```python
-from prefect import flow
+from prefect import flow, task
 
 @flow()
-def my_custom_flow()
+def my_custom_flow(
+    processor_id: str, 
+    pygeoapi_job_id: str, 
+    inputs: dict,
+    outputs: dict | None = None
+) -> None:
+     # perform whatever preparatory steps
+     generate_result(pygeoapi_job_id)
+
+
+@task(
+    persist_result=True,
+    result_storage_key="{parameters[pygeoapi_job_id].pickle}",
+    log_prints=True
+)
+def generate_result(pygeoapi_job_id: str) -> tuple[str, bytes]:
+    return "text/plain", "Hi there, I am a result".encode()
 
 ```
 

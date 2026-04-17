@@ -76,100 +76,6 @@ class ProcessJobControlOption(str, enum.Enum):
     DISMISS = "dismiss"
 
 
-class ProcessIOType(str, enum.Enum):
-    ARRAY = "array"
-    BOOLEAN = "boolean"
-    INTEGER = "integer"
-    NUMBER = "number"
-    OBJECT = "object"
-    STRING = "string"
-
-
-class ProcessIOFormat(enum.Enum):
-    # this is built from:
-    # - the jsonschema spec at: https://json-schema.org/draft/2020-12/json-schema-validation.html#name-defined-formats  # noqa: E501
-    # - the OAPI - Processes spec (table 13) at: https://docs.ogc.org/is/18-062r2/18-062r2.html#ogc_process_description  # noqa: E501
-    DATE_TIME = "date-time"
-    DATE = "date"
-    TIME = "time"
-    DURATION = "duration"
-    EMAIL = "email"
-    HOSTNAME = "hostname"
-    IPV4 = "ipv4"
-    IPV6 = "ipv6"
-    URI = "uri"
-    URI_REFERENCE = "uri-reference"
-    # left out `iri` and `iri-reference` as valid URIs are also valid IRIs
-    UUID = "uuid"
-    URI_TEMPLATE = "uri-template"
-    JSON_POINTER = "json-pointer"
-    RELATIVE_JSON_POINTER = "relative-json-pointer"
-    REGEX = "regex"
-    # the below `binary` entry does not seem to be defined in the jsonschema spec  # noqa: E501
-    # nor in OAPI - Processes - but it is mentioned in OAPI - Processes spec as an example  # noqa: E501
-    BINARY = "binary"
-    GEOJSON_FEATURE_COLLECTION_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/"
-        "geojson-feature-collection"
-    )
-    GEOJSON_FEATURE_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature"
-    )
-    GEOJSON_GEOMETRY_URI = (
-        "http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry"
-    )
-    OGC_BBOX_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/ogc-bbox"
-    GEOJSON_FEATURE_COLLECTION_SHORT_CODE = "geojson-feature-collection"
-    GEOJSON_FEATURE_SHORT_CODE = "geojson-feature"
-    GEOJSON_GEOMETRY_SHORT_CODE = "geojson-geometry"
-    OGC_BBOX_SHORT_CODE = "ogc-bbox"
-
-
-# this is a 'pydantification' of the schema.yml fragment, as shown
-# on the OAPI - Processes spec
-# class ProcessIOSchema(pydantic.BaseModel):
-#     model_config = pydantic.ConfigDict(use_enum_values=True)
-#
-#     title: str | None = None
-#     multiple_of: Annotated[float | None, pydantic.Field(alias="multipleOf")] = None
-#     maximum: float | None = None
-#     exclusive_maximum: Annotated[bool | None, pydantic.Field(alias="exclusiveMaximum")] = False
-#     minimum: float | None = None
-#     exclusive_minimum: Annotated[bool | None, pydantic.Field(alias="exclusiveMinimum")] = False
-#     max_length: Annotated[int | None, pydantic.Field(ge=0, alias="maxLength")] = None
-#     min_length: Annotated[int, pydantic.Field(ge=0, alias="minLength")] = 0
-#     pattern: str | None = None
-#     max_items: Annotated[int | None, pydantic.Field(ge=0, alias="maxItems")] = None
-#     min_items: Annotated[int, pydantic.Field(ge=0, alias="minItems")] = 0
-#     unique_items: Annotated[bool | None, pydantic.Field(alias="uniqueItems")] = False
-#     max_properties: Annotated[int | None, pydantic.Field(ge=0, alias="maxProperties")] = None
-#     min_properties: Annotated[int, pydantic.Field(ge=0, alias="minProperties")] = 0
-#     required: list[str] | None = None
-#     enum: list[Any] | None = None
-#     type_: Annotated[ProcessIOType | None, pydantic.Field(alias="type")] = None
-#     not_: Annotated["ProcessIOSchema | None", pydantic.Field(alias="not")] = None
-#     allOf: list["ProcessIOSchema"] | None = None
-#     oneOf: list["ProcessIOSchema"] | None = None
-#     anyOf: list["ProcessIOSchema"] | None = None
-#     items: list["ProcessIOSchema"] | None = None
-#     properties: "ProcessIOSchema | None" = None
-#     additional_properties: Annotated[
-#         bool | "ProcessIOSchema" | None,
-#         pydantic.Field(alias="additionalProperties")
-#     ] = True
-#     description: str | None = None
-#     format_: Annotated[ProcessIOFormat | None, pydantic.Field(alias="format")] = None
-#     default: dict | None = None
-#     nullable: bool | None = False
-#     read_only: Annotated[bool | None, pydantic.Field(alias="readOnly")] = False
-#     write_only: Annotated[bool | None, pydantic.Field(alias="writeOnly")] = False
-#     example: dict | None = None
-#     deprecated: bool | None = False
-#     content_media_type: Annotated[str | None, pydantic.Field(alias="contentMediaType")] = None
-#     content_encoding: Annotated[str | None, pydantic.Field(alias="contentEncoding")] = None
-#     content_schema: Annotated[str | None, pydantic.Field(alias="contentSchema")] = None
-
-
 class ProcessOutput(pydantic.BaseModel):
     title: str | None = None
     description: str | None = None
@@ -223,51 +129,12 @@ class InternalProcessDescription(pydantic.BaseModel):
     example: dict | None = None
 
 
-# class ExecutionInputBBox(pydantic.BaseModel):
-#     bbox: Annotated[list[float], pydantic.Field(min_length=4, max_length=4)]
-#     crs: str | None = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
-#
-#
-# class ExecutionInputValueNoObjectArray(
-#     pydantic.RootModel[
-#         list[
-#             "ExecutionInputBBox" | int | str | "ExecutionInputValueNoObjectArray"
-#         ]
-#     ]
-# ):
-#     pass
-#
-#
-# class ExecutionInputValueNoObject(
-#     pydantic.RootModel[
-#         str,
-#         float,
-#         int,
-#         bool,
-#         ExecutionInputBBox,
-#         ExecutionInputValueNoObjectArray,
-#     ]
-# ):
-#     """Models the `inputValueNoObject.yml` schema defined in OAPIP."""
-#
-#     pass
-
-
 class ExecutionFormat(pydantic.BaseModel):
     """Models the `format.yml` schema defined in OAPIP."""
 
     media_type: Annotated[str | None, pydantic.Field(alias="mediaType")] = None
     encoding: str | None = None
     schema_: Annotated[str | dict | None, pydantic.Field(alias="schema")] = None
-
-
-#
-#
-# class ExecutionQualifiedInputValue(pydantic.BaseModel):
-#     """Models the `qualifiedInputValue.yml` schema defined in OAPIP."""
-#
-#     value: Union[ExecutionInputValueNoObject, dict]
-#     format_: ExecutionFormat | None = None
 
 
 class ExecutionOutput(pydantic.BaseModel):

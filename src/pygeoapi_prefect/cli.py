@@ -7,12 +7,10 @@ from pygeoapi.process.base import BaseProcessor
 from pygeoapi.process.manager.base import get_manager
 from pygeoapi.util import yaml_load
 
-from . import (
-    BasePrefectProcessor,
-    PrefectManager,
-    vanilla_flow,
-)
+from .process import PrefectDeploymentProcessor
+from .manager import PrefectManager
 from .schemas import ProcessId
+from . import vanilla_flow
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +36,7 @@ def deploy_processors_locally(
     to_serve = []
     for processor_id in manager.processes:
         match processor := manager.get_processor(ProcessId(processor_id)):
-            case BasePrefectProcessor():
+            case PrefectDeploymentProcessor():
                 logger.debug(
                     f"Skipping process {processor_id!r} - it provides its own "
                     f"deployment configuration"
