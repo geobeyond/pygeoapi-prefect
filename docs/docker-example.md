@@ -3,7 +3,7 @@
 #### Work pool
 
 Prefect is able to run flows inside ephemeral docker containers.
-This requires that a Prefect work pool be created with the `docker` type:
+This requires that a Prefect work pool be created with the `docker` type, with some additional configuration:
 
 === "uv"
 
@@ -58,13 +58,14 @@ Start a worker that consumes work from this newly-created pool
 Write your processing flow, for example:
 
 ```python
+# simple_flow_docker.py
 from prefect import flow, task
 
 
 @flow(log_prints=True)
 def simple_flow(
         processor_id: str,
-        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs
+        pygeoapi_job_id: str,
         inputs: dict,
         outputs: dict | None = None,
 ) -> None:
@@ -77,7 +78,7 @@ def simple_flow(
     result_storage_key="{parameters[pygeoapi_job_id]}.pickle",
     log_prints=True,
 )
-def generate_greeting(name: str, message: str | None = None) -> str:
+def generate_greeting(name: str, pygeoapi_job_id: str, message: str | None = None) -> str:
     result = f"Hi {name}!"
     if message:
         result += f" {message}"
@@ -86,7 +87,7 @@ def generate_greeting(name: str, message: str | None = None) -> str:
 
 if __name__ == "__main__":
     simple_flow.deploy(
-        name="first-deployment",
+        name="second-deployment",
         work_pool_name="my-pool",
         image="pygeoapi-prefect/flows/simple-flow",
         push=False
@@ -98,20 +99,20 @@ Deploy it:
 === "uv"
 
     ```shell
-    uv run python simple_flow.py
+    uv run python simple_flow_docker.py
     ```
 
 === "pip"
 
     ```shell
-    python simple_flow.py
+    python simple_flow_docker.py
     ```
 
 This creates a docker image named `pygeoapi-prefect/flows/simple-flow:{date}` with the flow contents and registers
-a deployment named `simple-flow/first-deployment` with the Prefect server. Because our `simple_flow.deploy()` call
+a deployment named `simple-flow/second-deployment` with the Prefect server. Because our `simple_flow.deploy()` call
 includes `push=False`, this docker image lives in the local filesystem only.
 
-You can check the Prefect server UI in order to verify that your deployment is now registered. You can also used the
+You can check the Prefect server UI in order to verify that your deployment is now registered. You can also use the
 Prefect API:
 
 === "uv"
@@ -135,18 +136,18 @@ Configure pygeoapi with this newly deployed flow:
 # snippet of pygeoapi configuration file
 # (the rest of the configuration has been omitted for brevity)
 resources:
-  simple-flow:
+  another-simple-flow:
     type: process
     processor:
       prefect:
         deployment:
-          name: simple-flow/first-deployment
-          result_storage_key_template: "{parameters[pygeoapi_job_id]}.pickle"
+          name: simple-flow/second-deployment
+          result_storage_key_template: "{job_id}.pickle"
         metadata:
           version: 0.0.1
           title: Hi world prefect example
           description: >
-            An example processor that is powered by a Prefect deployment.
+            An example processor that is powered by a Prefect deployment and executes inside ephemeral docker containers.
           inputs:
             name:
               description: Some name you think is cool. It will be used to greet you
@@ -170,6 +171,14 @@ resources:
 
 Finally, start pygeoapi:
 
+=== "uv"
+
+```shell
+uv run pygeoapi serve
+```
+
+=== "pip"
+
 ```shell
 pygeoapi serve
 ```
@@ -180,16 +189,16 @@ pygeoapi serve
 Check that pygeoapi recognizes our Prefect flow:
 
 ```shell
-http localhost:5000/processes/simple-flow
+curl http://localhost:5000/processes/another-simple-flow
 ```
 
-The response should include the description of the `simple-flow` processor and also a link for executing it. Execution
+The response should include the description of the `another-simple-flow` processor and also a link for executing it. Execution
 can be requested with:
 
 ```shell
 curl \
     -sSi \
-    -X POST "http://localhost:5000/processes/simple-flow/execution" \
+    -X POST "http://localhost:5000/processes/another-simple-flow/execution" \
     -H "Content-Type: application/json" \
     -d '{"inputs": {"name": "Joe"}}'
 ```

@@ -36,6 +36,9 @@ def generate_greeting(
 
 
 if __name__ == "__main__":
-    simple_flow.serve(
-        name="first-deployment",
+    simple_flow.deploy(
+        name="second-deployment",
+        work_pool_name="my-pool",
+        image="pygeoapi-prefect/flows/simple-flow",
+        push=False
     )

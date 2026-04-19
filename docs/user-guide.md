@@ -75,13 +75,10 @@ Then start a local Prefect server
    This will start up a local Prefect server listening on port 4200. The Prefect UI becomes available at
    `http://localhost:4200`
 
-
-#### Prefect server configuration
-
-- Result persistence
-- Worker types
-- Concurrency limits
-- Etc.
+Prefect is a very flexible platform and can be set up and configured in many ways. The only hard requirement 
+for pygeoapi-prefect is that Prefect's result management facilities are enabled. Please consult the 
+[Prefect documentation](https://docs.prefect.io/v3/get-started) and the [examples section](docker-example.md) for 
+further configuration info.
 
 
 ### Pygeoapi

@@ -8,7 +8,6 @@ from pygeoapi.process.manager.base import get_manager
 from pygeoapi.util import yaml_load
 
 from .process import PrefectDeploymentProcessor
-from .manager import PrefectManager
 from .schemas import ProcessId
 from . import vanilla_flow
 
@@ -28,11 +27,6 @@ def deploy_processors_locally(
     with pygeoapi_config.open() as fh:
         config = yaml_load(fh)
     manager = get_manager(config)
-    if not isinstance(manager, PrefectManager):
-        raise SystemExit(
-            "Cannot deploy as prefect flows - pygeoapi_prefect.PrefectManager "
-            "is not being used as the pygeoapi process manager"
-        )
     to_serve = []
     for processor_id in manager.processes:
         match processor := manager.get_processor(ProcessId(processor_id)):
