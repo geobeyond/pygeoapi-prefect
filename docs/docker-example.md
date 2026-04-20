@@ -3,21 +3,90 @@
 #### Work pool
 
 Prefect is able to run flows inside ephemeral docker containers.
-This requires that a Prefect work pool be created with the `docker` type, with some additional configuration:
+This requires that a Prefect work pool be created with the `docker` type and some additional configuration.
+
+For this example we are running everything inside a single node, so we'll configure the work pool to bind mount a
+local directory inside the ephemeral container and have Prefect store results inside this directory.
+
+This configuration is done by getting the default job template, modifying it and then using it to create a work pool.
+
+??? note "Obtaining the default template for docker work pools"
+
+    The default template can be gotten by using the Prefect CLI:
+
+    === "uv"
+
+        ```shell
+        uv run prefect work-pool get-default-base-job-template --type docker
+        ```
+
+    === "pip"
+
+        ```shell
+        prefect work-pool get-default-base-job-template --type docker
+        ```
+
+
+The configuration of the work pool needs to specify a default bind volume and this also needs to be set as env
+variables in order to be picked up by Prefect at runtime.
+
+Configuration of the volumes can be done by modifying the `variables.properties.volumes.default` key and the
+environment variables can be set by modifying the `variables.properties.env.default` key:
+
+```yaml
+# relevant modifications to the job template file
+# file: docker-pool-job-template.json
+{
+  "variables": {
+    "properties": {
+      "volumes": {
+        "default": ["<prefect-storage-path-on-local-disk>:/storage"]
+      },
+      "env": {
+        "default": {
+          "PREFECT_RESULTS_PERSIST_BY_DEFAULT": "true",
+          "PREFECT_LOCAL_STORAGE_PATH": "/storage"
+        }
+  }
+}
+```
+
+!!! warning
+
+    Ensure you use absolute paths for your volume binds, as Prefect won't perform any expansion of special
+    charachters like `~`
+
+
+After having prepared the job template file, create the Prefect work pool:
+
 
 === "uv"
 
     ```shell
-    uv run prefect work-pool create --type docker my-pool
+    uv run prefect work-pool create \
+        --type docker \
+        --base-job-template docker-pool-job-template.json \
+        my-pool
     ```
 
 === "pip"
 
     ```shell
     source .venv/bin/activate
-    
-    prefect work-pool create --type docker my-pool
+
+    prefect work-pool create \
+        --type docker \
+        --base-job-template docker-pool-job-template.json \
+        my-pool
     ```
+
+!!! warning
+
+    Ensure the `PREFECT_LOCAL_STORAGE_PATH` environment variable is not set when you start the worker, as otherwise
+    the ephemeral docker containers that it spawns will inherit this variable, overriding the configuration set
+    in the job template
+
+After creation, the work pool can be examined via the Prefect UI or CLI.
 
 Start a worker that consumes work from this newly-created pool
 
@@ -206,11 +275,32 @@ curl \
 The response:
 
 ```shell
-HTTP/1.1 201 CREATED
-Content-Type: None
-Content-Language: en-US
-Preference-Applied: respond-async
-Location: http://localhost:5000/jobs/af101d53-7dcc-4882-a15b-a85fd4381153
+HTTP/1.1 200 OK
+Content-Type: text/plain
+Preference-Applied: wait
+Location: http://localhost:5000/jobs/e5e26d6d-ce80-479e-a23e-5d488c71df17
 
-{"jobID":"af101d53-7dcc-4882-a15b-a85fd4381153","type":"process","status":"accepted"}
+Hi Joe!
+```
+
+
+An async request would be instead:
+
+```shell
+curl \
+    -sSi \
+    -X POST "http://localhost:5000/processes/another-simple-flow/execution" \
+    -H "Prefer: respond-async" \
+    -H "Content-Type: application/json" \
+    -d '{"inputs": {"name": "Joe"}}'
+```
+
+And the response:
+
+```shell
+HTTP/1.1 201 CREATED
+Preference-Applied: respond-async
+Location: http://localhost:5000/jobs/2d5852fc-ae9d-46a9-bd1c-8d1f8e6c7ef0
+
+{"jobID":"2d5852fc-ae9d-46a9-bd1c-8d1f8e6c7ef0","type":"process","status":"accepted"}
 ```
