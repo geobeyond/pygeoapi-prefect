@@ -1,5 +1,6 @@
 from typing import (
     Any,
+    Optional,
     Protocol,
     TYPE_CHECKING,
 )
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     )
 
 
-class PygeoapiProcessorProtocol(Protocol):
+class InspectableProcessorProtocol(Protocol):
     @property
     def name(self) -> str: ...
 
@@ -30,12 +31,6 @@ class PygeoapiProcessorProtocol(Protocol):
 
     @property
     def supports_outputs(self) -> bool: ...
-
-    def set_job_id(self, job_id: str) -> None: ...
-
-    def execute(
-        self, data_: dict[str, Any], outputs: list[str] | dict[str, Any] | None = None
-    ) -> tuple[str, Any]: ...
 
 
 class PygeoapiProcessManagerProtocol(Protocol):
@@ -60,7 +55,7 @@ class PygeoapiProcessManagerProtocol(Protocol):
     def processes(self) -> dict[str, dict[str, Any]]:
         """Return processor configurations known to the manager"""
 
-    def get_processor(self, process_id: "ProcessId") -> PygeoapiProcessorProtocol:
+    def get_processor(self, process_id: "ProcessId") -> InspectableProcessorProtocol:
         """Instantiate a processor."""
 
     def get_jobs(
@@ -97,7 +92,7 @@ class PygeoapiProcessManagerProtocol(Protocol):
         subscriber: Subscriber | None = None,
         requested_response: RequestedResponse | None = RequestedResponse.raw,
     ) -> tuple[
-        "PygeoapiPrefectJobId", "MediaType", "JobOutputs", JobStatus, "ResponseHeaders" | None
+        "PygeoapiPrefectJobId", "MediaType", "JobOutputs", JobStatus, Optional["ResponseHeaders"]
     ]:
         """Execute a process"""
 

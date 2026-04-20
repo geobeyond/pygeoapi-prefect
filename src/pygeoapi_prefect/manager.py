@@ -7,19 +7,24 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from typing import Any
+from typing import (
+    Any,
+    cast,
+)
 
 import httpx
 import jsonschema.exceptions
 import jsonschema.validators
-from prefect.client.schemas import FlowRun
+from prefect.client.schemas import (
+    FlowRun,
+    StateType,
+)
+from prefect.client.schemas.objects import Flow
 from prefect.deployments import run_deployment
 from prefect.results import (
     ResultRecord,
     ResultStore,
 )
-from prefect.server.schemas.core import Flow
-from prefect.server.schemas.states import StateType
 
 from pygeoapi.process.base import (
     BaseProcessor,
@@ -42,7 +47,7 @@ from . import (
     vanilla_flow,
 )
 from .process import PrefectDeploymentProcessor
-from .protocols import PygeoapiProcessorProtocol
+from .protocols import InspectableProcessorProtocol
 from .schemas import (
     ExecutionOutput,
     JobList,
@@ -117,7 +122,7 @@ class PrefectManager:
             self._validate_processor_configuration(self.get_processor(id_))
 
     def _validate_processor_configuration(
-        self, processor: PygeoapiProcessorProtocol
+        self, processor: InspectableProcessorProtocol
     ) -> None:
         """Validate a processor configuration's inputs and outputs with jsonschema"""
         io_params = [
@@ -161,7 +166,7 @@ class PrefectManager:
                 ) from err
 
     @property
-    def processes(self) -> dict[str, dict]:
+    def processes(self) -> dict[ProcessId, dict]:
         return copy.deepcopy(self._processor_configurations)
 
     def get_jobs(
@@ -268,13 +273,13 @@ class PrefectManager:
                     result_storage_key=f"{job_id}.pickle",
                 )
 
-    def delete_job(  # type: ignore [empty-body]
+    def delete_job(
         self, job_id: str
-    ) -> JobStatusInfoInternal:
+    ) -> None:
         """Delete a job and associated results/outputs."""
-        pass
+        raise NotImplementedError
 
-    def get_processor(self, process_id: ProcessId) -> PygeoapiProcessorProtocol:
+    def get_processor(self, process_id: ProcessId) -> InspectableProcessorProtocol:
         if (resource_conf := self._processor_configurations.get(process_id)) is None:
             raise UnknownProcessError(f"processor with id {process_id!r} is not known")
 
@@ -307,20 +312,12 @@ class PrefectManager:
             processor = PrefectDeploymentProcessor.from_pygeoapi_conf(
                 process_id, resource_conf["processor"]
             )
-            # module_path, processor_type_name = resource_conf["processor"][
-            #     "name"
-            # ].rpartition(".")[::2]
-            # loaded_module = importlib.import_module(module_path)
-            # processor_type: type[BasePrefectProcessor] = getattr(
-            #     loaded_module, processor_type_name
-            # )
-            # processor = processor_type.from_pygeoapi_conf(
-            #     process_id, resource_conf["processor"]
-            # )
             processor.process_description.job_control_options = job_control_options
         else:
-            processor = load_plugin("process", resource_conf["processor"])
-            processor: BaseProcessor
+            processor = cast(
+                BaseProcessor,
+                load_plugin("process", resource_conf["processor"])
+            )
             processor.metadata["jobControlOptions"] = job_control_options
         return processor
 

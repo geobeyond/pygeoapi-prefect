@@ -1,20 +1,13 @@
 site_name: pygeoapi-prefect
 repo_url: https://github.com/geobeyond/pygeoapi-prefect
 repo_name: pygeoapi-prefect
-site_description: pygeoapi process manager pwered by prefect
+site_description: pygeoapi process manager powered by prefect
 site_author: geobeyond
 edit_uri: edit/main/docs/
 
 nav:
   - Home: 'index.md'
   - User Guide: 'user-guide.md'
-  # - User Guide:
-    # - Installation: 'user-guide/installation.md'
-    # - Defining processes: 'user-guide/defining-processes.md'
-    # - Running prefect: 'user-guide/prefect.md'
-    # - Deployments: 'user-guide/deployments.md'
-    # - Executing processes: 'user-guide/executing-processes.md'
-    # - Complete example: 'user-guide/complete-example.md'
   - Development: 'development.md'
   - Examples:
     - Run processes inside ephemeral docker containers: 'docker-example.md'

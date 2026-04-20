@@ -1,6 +1,10 @@
+from typing import cast
 from prefect import flow
 from prefect.assets import materialize
-from prefect.results import get_result_store
+from prefect.results import (
+    get_result_store,
+    LocalFileSystem,
+)
 
 
 @flow(log_prints=True)
@@ -12,7 +16,8 @@ def simple_flow(
 ) -> None:
     print(f"Hi from simple_flow locals: {locals()}")
     result_store = get_result_store()
-    base_path = result_store.result_storage.basepath
+    storage = cast(LocalFileSystem, result_store.result_storage)
+    base_path = storage.basepath
     base_task = generate_greeting
 
     dynamic_task = generate_greeting.with_options(
