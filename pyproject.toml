@@ -9,10 +9,11 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pydantic>=1.10.7,<2",
-    "prefect>=2.9.0,<3",
-    "click==8.0.0",  # this version is fixed in order to be compatible with upstream pygeoapi
+    "pydantic>=2.0",
+    "prefect>=3.0",
+    "click==8.0.0", # this version is fixed in order to be compatible with upstream pygeoapi
     "pygeoapi",
+    "jsonschema[format]>=4.26.0",
 ]
 
 [dependency-groups]
@@ -22,6 +23,7 @@ dev = [
     "pytest>=7.3.1",
     "ruff>=0.9",
     "ty>=0.0.1a5",
+    "prefect-docker>=0.7.1",
 ]
 docs = [
     "mkdocs>=1.4.3",
@@ -33,6 +35,9 @@ prefect = "pygeoapi_prefect.cli:root"
 
 [tool.uv.sources]
 pygeoapi = { path = "../../pygeoapi", editable = true }
+
+[tool.ty.analysis]
+allowed-unresolved-imports = ["pygeoapi.**"]
 
 [build-system]
 requires = ["hatchling"]

@@ -18,7 +18,8 @@ server:
     url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
     attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
   manager:
-    name: pygeoapi_prefect.manager.PrefectManager
+    name: pygeoapi_prefect.PrefectManager
+    # use_deployment_for_sync_requests: false
     # name: TinyDB
     # connection: /tmp/pygeoapi-process-manager.db
     output_dir: /tmp/
@@ -69,32 +70,83 @@ resources:
     type: process
     processor:
       name: HelloWorld
-
-#  greeter:
-#    type: process
-#    processor:
-#      name: pygeoapi.process.hello_world.GreeterProcessor
+      job_control_options:
+        - sync-execute
+        - async-execute
 
   simple-flow:
     type: process
     processor:
-      name: pygeoapi_prefect.examples.simple_prefect.SimpleFlowProcessor
+      job_control_options:
+        - sync-execute
+        - async-execute
       prefect:
-        result_storage: remote-file-system/test-sb1-results
         deployment:
-          name: minio
-          queue: pygeoapi
-          storage_block: remote-file-system/test-sb1
-          storage_sub_path: simple-flow-flow
-
-  hi-prefect-world:
+          name: simple-flow/first-deployment
+          result_storage_key_template: "{job_id}.pickle"
+        metadata:
+          version: 0.0.1
+          title: Hi world prefect example
+          description: >
+            An example processor that is powered by a Prefect deployment.
+          inputs:
+            name:
+              description: Some name you think is cool. It will be used to greet you
+              schema:
+                type: string
+            message:
+              title: My message
+              description: An optional additional message to be echoed
+              schema:
+                type: string
+              minOccurs: 0
+          outputs:
+            result:
+              schema:
+                type: string
+                contentMediaType: text/plain
+          keywords:
+            - processor
+            - prefect
+            - example
+          example:
+            inputs:
+              name: Joe
+  another-simple-flow:
     type: process
     processor:
-      name: pygeoapi_prefect.examples.hi_prefect_world.HiPrefectWorldProcessor
+      job_control_options:
+        - sync-execute
+        - async-execute
       prefect:
-        result_storage: remote-file-system/test-sb1-results
         deployment:
-          name: minio
-          queue: pygeoapi
-          storage_block: remote-file-system/test-sb1
-          storage_sub_path: hi-prefect-world-flow
+          name: simple-flow/second-deployment
+          result_storage_key_template: "{job_id}.pickle"
+        metadata:
+          version: 0.0.1
+          title: Hi world prefect example
+          description: >
+            An example processor that is powered by a Prefect deployment and executes inside ephemeral docker containers.
+          inputs:
+            name:
+              description: Some name you think is cool. It will be used to greet you
+              schema:
+                type: string
+            message:
+              title: My message
+              description: An optional additional message to be echoed
+              schema:
+                type: string
+              minOccurs: 0
+          outputs:
+            result:
+              schema:
+                type: string
+                contentMediaType: text/plain
+          keywords:
+            - processor
+            - prefect
+            - example
+          example:
+            inputs:
+              name: Joe

@@ -1,20 +1,16 @@
 site_name: pygeoapi-prefect
 repo_url: https://github.com/geobeyond/pygeoapi-prefect
 repo_name: pygeoapi-prefect
-site_description: pygeoapi process manager pwered by prefect
+site_description: pygeoapi process manager powered by prefect
 site_author: geobeyond
 edit_uri: edit/main/docs/
 
 nav:
   - Home: 'index.md'
-  - User Guide:
-      - Installation: 'user-guide/installation.md'
-      - Defining processes: 'user-guide/defining-processes.md'
-      - Running prefect: 'user-guide/prefect.md'
-      - Deployments: 'user-guide/deployments.md'
-      - Executing processes: 'user-guide/executing-processes.md'
-      - Complete example: 'user-guide/complete-example.md'
+  - User Guide: 'user-guide.md'
   - Development: 'development.md'
+  - Examples:
+    - Run processes inside ephemeral docker containers: 'docker-example.md'
 
 theme:
   name: material
@@ -23,8 +19,10 @@ theme:
     accent: pink
   features:
     - content.action.edit
+    - content.tabs.link
     - header.autohide
     - navigation.footer
+    - navigation.indexes
     - navigation.tabs
     - navigation.tabs.sticky
 
@@ -34,8 +32,8 @@ markdown_extensions:
   - def_list
   - pymdownx.details
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -43,5 +41,7 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - toc:
       permalink: true
