@@ -21,6 +21,7 @@ from prefect.client.schemas import (
 )
 from prefect.client.schemas.objects import Flow
 from prefect.deployments import run_deployment
+from prefect.filesystems import WritableFileSystem
 from prefect.results import (
     ResultRecord,
     ResultStore,
@@ -52,7 +53,6 @@ from .schemas import (
     ExecutionOutput,
     JobList,
     JobOutputs,
-    JobStatusInfoInternal,
     JobStatusInfo,
     MediaType,
     ProcessId,
@@ -64,7 +64,7 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 
-PREFECT_STATE_MAP = {
+PREFECT_STATE_MAP: dict[StateType, JobStatus] = {
     StateType.SCHEDULED: JobStatus.accepted,
     StateType.PENDING: JobStatus.accepted,
     StateType.RUNNING: JobStatus.running,
@@ -265,7 +265,9 @@ class PrefectManager:
             if isinstance(processor, PrefectDeploymentProcessor):
                 return _retrieve_result_from_prefect(
                     result_storage_block=processor.deployment_info.result_storage_block,
-                    result_storage_key=processor.deployment_info.result_storage_key_template.format(job_id=job_id),
+                    result_storage_key=processor.deployment_info.result_storage_key_template.format(
+                        job_id=job_id
+                    ),
                 )
             else:
                 return _retrieve_result_from_prefect(
@@ -273,9 +275,7 @@ class PrefectManager:
                     result_storage_key=f"{job_id}.pickle",
                 )
 
-    def delete_job(
-        self, job_id: str
-    ) -> None:
+    def delete_job(self, job_id: str) -> None:
         """Delete a job and associated results/outputs."""
         raise NotImplementedError
 
@@ -315,8 +315,7 @@ class PrefectManager:
             processor.process_description.job_control_options = job_control_options
         else:
             processor = cast(
-                BaseProcessor,
-                load_plugin("process", resource_conf["processor"])
+                BaseProcessor, load_plugin("process", resource_conf["processor"])
             )
             processor.metadata["jobControlOptions"] = job_control_options
         return processor
@@ -409,7 +408,7 @@ class PrefectManager:
             job_id=job_id,
             processor_metadata=processor.metadata,
             execution_parameters=flow_run.parameters,
-            status=PREFECT_STATE_MAP[flow_run.state_type],
+            status=PREFECT_STATE_MAP[flow_run.state_type or StateType.SCHEDULED],
             created=flow_run.created,
             started=flow_run.start_time,
             finished=flow_run.end_time,
@@ -450,9 +449,15 @@ def _retrieve_result_from_prefect(
     result_storage_block: str | None,
     result_storage_key: str,
 ) -> tuple[MediaType, Any]:
-    # defer determination of the result storage to Prefect, in order to allow
-    # for external configuration
-    result_store = ResultStore(result_storage=result_storage_block)
+
+    if result_storage_block:
+        storage = cast(
+            WritableFileSystem, WritableFileSystem.load(result_storage_block)
+        )
+    else:
+        storage = None  # Use whatever is configured on the host
+
+    result_store = ResultStore(result_storage=storage)
     result_record: ResultRecord = result_store.read(result_storage_key)
     logger.debug(f"debug {result_record=}")
     print(f"print {result_record=}")
@@ -514,7 +519,9 @@ def _execute_job_sync_via_deployment(
         )
     return _retrieve_result_from_prefect(
         result_storage_block=processor.deployment_info.result_storage_block,
-        result_storage_key=processor.deployment_info.result_storage_key_template.format(job_id=job_id),
+        result_storage_key=processor.deployment_info.result_storage_key_template.format(
+            job_id=job_id
+        ),
     )
 
 
@@ -555,16 +562,19 @@ def _execute_job_via_deployment(
     outputs: dict,
     timeout_seconds: int | None,
 ) -> JobStatus:
-    flow_run = run_deployment(
-        name=deployment_name,
-        flow_run_name=job_id.to_flow_run_name(),
-        parameters={
-            "processor_id": processor_id,
-            "pygeoapi_job_id": job_id,
-            "inputs": inputs,
-            "outputs": outputs,
-        },
-        timeout=timeout_seconds
-        or 0,  # a value of zero means run in non-blocking fashion (async mode)
+    flow_run = cast(
+        FlowRun,
+        run_deployment(
+            name=deployment_name,
+            flow_run_name=job_id.to_flow_run_name(),
+            parameters={
+                "processor_id": processor_id,
+                "pygeoapi_job_id": job_id,
+                "inputs": inputs,
+                "outputs": outputs,
+            },
+            timeout=timeout_seconds
+            or 0,  # a value of zero means run in non-blocking fashion (async mode)
+        ),
     )
-    return PREFECT_STATE_MAP[flow_run.state_type]
+    return PREFECT_STATE_MAP[flow_run.state_type or StateType.SCHEDULED]
