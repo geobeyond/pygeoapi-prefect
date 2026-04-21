@@ -92,7 +92,11 @@ class PygeoapiProcessManagerProtocol(Protocol):
         subscriber: Subscriber | None = None,
         requested_response: RequestedResponse | None = RequestedResponse.raw,
     ) -> tuple[
-        "PygeoapiPrefectJobId", "MediaType", "JobOutputs", JobStatus, Optional["ResponseHeaders"]
+        "PygeoapiPrefectJobId",
+        "MediaType",
+        "JobOutputs",
+        JobStatus,
+        Optional["ResponseHeaders"],
     ]:
         """Execute a process"""
 

@@ -2217,8 +2217,8 @@ wheels = [
 
 [[package]]
 name = "pygeoapi"
-version = "0.24.dev0"
-source = { editable = "../../pygeoapi" }
+version = "0.23.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "babel" },
     { name = "click" },
@@ -2239,32 +2239,13 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tinydb" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "babel" },
-    { name = "click" },
-    { name = "filelock" },
-    { name = "flask" },
-    { name = "jinja2" },
-    { name = "jsonschema" },
-    { name = "pydantic" },
-    { name = "pygeofilter" },
-    { name = "pygeoif" },
-    { name = "pyproj" },
-    { name = "python-dateutil" },
-    { name = "pytz" },
-    { name = "pyyaml" },
-    { name = "rasterio" },
-    { name = "requests" },
-    { name = "shapely" },
-    { name = "sqlalchemy" },
-    { name = "tinydb" },
+sdist = { url = "https://files.pythonhosted.org/packages/82/34/18068e9d2f2fa5c197b4e15df7df714b09bc96c21c516bdbddea546ab150/pygeoapi-0.23.0.tar.gz", hash = "sha256:81e7f9e53deb9d91265dcc13ea72b64d6abecc95a2c1f06a22c5e1f02070a85a", size = 370864, upload-time = "2026-03-06T12:53:47.48Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/80/a2ea8001b0d83bb5e59022c8ee8a793ef75e4daaca9d51359f1391e9f49c/pygeoapi-0.23.0-py2.py3-none-any.whl", hash = "sha256:05a71d66f3e845ccac0592a14aa6f28923230af30a57f34c0cf99f925e3e6a58", size = 576653, upload-time = "2026-03-06T12:53:46.114Z" },
 ]
 
 [[package]]
 name = "pygeoapi-prefect"
-version = "0.1.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -2294,7 +2275,7 @@ requires-dist = [
     { name = "jsonschema", extras = ["format"], specifier = ">=4.26.0" },
     { name = "prefect", specifier = ">=3.0" },
     { name = "pydantic", specifier = ">=2.0" },
-    { name = "pygeoapi", editable = "../../pygeoapi" },
+    { name = "pygeoapi" },
 ]
 
 [package.metadata.requires-dev]

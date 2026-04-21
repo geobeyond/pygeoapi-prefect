@@ -13,12 +13,11 @@ repos:
     hooks:
       - id: ruff-check
       - id: ruff-format
-  # the below hooks are disabled for now
-  # - repo: local
-  #   hooks:
-  #     - id: ty
-  #       name: ty
-  #       entry: uv run ty check
-  #       language: system
-  #       types: [python]
-  #       pass_filenames: false
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty
+        entry: uv run ty check
+        language: system
+        types: [python]
+        pass_filenames: false

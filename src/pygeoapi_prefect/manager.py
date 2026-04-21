@@ -374,6 +374,7 @@ class PrefectManager:
                 ),
             )
         elif chosen_execution_mode == ProcessExecutionMode.sync_execute:
+            processor = cast(BaseProcessor, processor)
             media_type, generated_output = _execute_job_sync_in_process(
                 job_id, processor, inputs, outs, response_type, subscriber
             )
@@ -387,6 +388,7 @@ class PrefectManager:
                 ),
             )
         else:
+            processor = cast(PrefectDeploymentProcessor, processor)
             response_headers = ResponseHeaders(
                 {
                     "Preference-Applied": RequestedProcessExecutionMode.respond_async.value
@@ -417,7 +419,7 @@ class PrefectManager:
 
 def _select_execution_mode(
     requested_mode: RequestedProcessExecutionMode | None,
-    processor: BaseProcessor | PrefectDeploymentProcessor,
+    processor: BaseProcessor | InspectableProcessorProtocol,
 ) -> ProcessExecutionMode:
     requested = requested_mode or RequestedProcessExecutionMode.wait
     if requested == RequestedProcessExecutionMode.wait:

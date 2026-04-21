@@ -6,10 +6,10 @@ from prefect import (
 
 @flow(log_prints=True)
 def simple_flow(
-        processor_id: str,
-        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs
-        inputs: dict,
-        outputs: dict | None = None,
+    processor_id: str,
+    pygeoapi_job_id: str,
+    inputs: dict,
+    outputs: dict | None = None,
 ) -> None:
     print(f"Hi from simple_flow locals: {locals()}")
     generate_greeting(
@@ -25,9 +25,9 @@ def simple_flow(
     log_prints=True,
 )
 def generate_greeting(
-        name: str,
-        pygeoapi_job_id: str,  # noqa, this is used for naming flow_runs
-        message: str | None = None
+    name: str,
+    pygeoapi_job_id: str,  # noqa
+    message: str | None = None,
 ) -> tuple[str, bytes]:
     result = f"Hi {name}!"
     if message:
