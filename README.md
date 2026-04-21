@@ -2,12 +2,8 @@
 
 A process manager for [pygeoapi] that uses [prefect].
 
+Check out the [docs](https://geobeyond.github.io/pygeoapi-prefect/)
+
 
 [pygeoapi]: https://pygeoapi.io/
 [prefect]: https://www.prefect.io/
-
-
-## Installation
-
-In time, this project will be available in the python package index (AKA pypi) and be installable via pip, but for
-now you can install it by git cloning and then using uv to install

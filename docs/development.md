@@ -17,6 +17,7 @@ Prepare a `.env` suitable for development, similar to:
 ```dotenv
 # prefect variables
 PREFECT_API_URL=http://127.0.0.1:4200/api
+PREFECT_RESULTS_PERSIST_BY_DEFAULT=true
 PREFECT_SERVER_ANALYTICS_ENABLED=false
 DO_NOT_TRACK=1
 
