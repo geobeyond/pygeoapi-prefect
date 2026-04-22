@@ -38,5 +38,3 @@ jobs:
           append_body: true
       - name: "Publish to PyPI"
         uses: pypa/gh-action-pypi-publish@v1.14.0
-        with:
-          attestations: "true"
