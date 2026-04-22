@@ -48,7 +48,7 @@ documentation = "https://geobeyond.github.io/pygeoapi-prefect/"
 dev = [
     "ipython>=8.11.0",
     "s3fs==2023.1.0",
-    "pytest>=7.3.1",
+    "pytest>=9.0.3",
     "ruff>=0.9",
     "ty>=0.0.1a5",
     "prefect-docker>=0.7.1",
