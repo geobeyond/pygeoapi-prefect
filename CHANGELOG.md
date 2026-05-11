@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [0.9.1] - 2026-05-11
+
 ### Added
 
 - CLI command now accepts a `--concurrency-limit` param to control concurrency when using the local Prefect worker
@@ -23,5 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - First stable release
 
 
-[unreleased]: https://github.com/geobeyond/pygeoapi-prefect/compare/v0.9.0...HEAD
+[unreleased]: https://github.com/geobeyond/pygeoapi-prefect/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/geobeyond/pygeoapi-prefect/releases/tag/v0.9.1
 [0.9.0]: https://github.com/geobeyond/pygeoapi-prefect/releases/tag/v0.9.0
