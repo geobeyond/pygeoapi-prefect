@@ -21,6 +21,7 @@ from prefect.client.schemas import (
 )
 from prefect.client.schemas.objects import Flow
 from prefect.deployments import run_deployment
+from prefect.exceptions import ObjectNotFound
 from prefect.filesystems import WritableFileSystem
 from prefect.results import (
     ResultRecord,
@@ -564,19 +565,24 @@ def _execute_job_via_deployment(
     outputs: dict,
     timeout_seconds: int | None,
 ) -> JobStatus:
-    flow_run = cast(
-        FlowRun,
-        run_deployment(
-            name=deployment_name,
-            flow_run_name=job_id.to_flow_run_name(),
-            parameters={
-                "processor_id": processor_id,
-                "pygeoapi_job_id": job_id,
-                "inputs": inputs,
-                "outputs": outputs,
-            },
-            timeout=timeout_seconds
-            or 0,  # a value of zero means run in non-blocking fashion (async mode)
-        ),
-    )
+    try:
+        flow_run = cast(
+            FlowRun,
+            run_deployment(
+                name=deployment_name,
+                flow_run_name=job_id.to_flow_run_name(),
+                parameters={
+                    "processor_id": processor_id,
+                    "pygeoapi_job_id": job_id,
+                    "inputs": inputs,
+                    "outputs": outputs,
+                },
+                timeout=timeout_seconds
+                or 0,  # a value of zero means run in non-blocking fashion (async mode)
+            ),
+        )
+    except ObjectNotFound as err:
+        raise ProcessorExecuteError(
+            f"Deployment not found for processor {processor_id!r}"
+        ) from err
     return PREFECT_STATE_MAP[flow_run.state_type or StateType.SCHEDULED]
