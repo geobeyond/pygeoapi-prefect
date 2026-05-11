@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CLI command now accepts a `--concurrency-limit` param to control concurrency when using the local Prefect worker
+
 ### Fixed
 
 - Add more informative error for when a process cannot be executed because it has no deployment
