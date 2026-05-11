@@ -20,8 +20,21 @@ def root(): ...
 
 @root.command(name="deploy-local")
 @click.option("-c", "--pygeoapi-config", type=Path, envvar="PYGEOAPI_CONFIG")
+@click.option(
+    "-l",
+    "--concurrency-limit",
+    type=click.IntRange(min=1, max=100, clamp=True),
+    default=5,
+    show_default=True,
+    help=(
+        "Number of jobs that are allowed to run at the same time. When the "
+        "number of requests exceeds this value, pending executions are "
+        "queued."
+    ),
+)
 def deploy_processors_locally(
     pygeoapi_config: Path,
+    concurrency_limit: int,
 ):
     """Deploy pygeoapi processes via Prefect, locally."""
     with pygeoapi_config.open() as fh:
@@ -46,4 +59,7 @@ def deploy_processors_locally(
             case _:
                 logger.warning(f"Unknown processor type {processor_id}, ignoring...")
                 continue
-    serve(*to_serve)
+    serve(
+        *to_serve,
+        limit=concurrency_limit,
+    )
