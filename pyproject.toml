@@ -70,6 +70,9 @@ source = "vcs"
 [tool.hatch.version.raw-options]
 version_scheme = "python-simplified-semver"
 
+[tool.uv.sources]
+pygeoapi = { git = "https://github.com/geopython/pygeoapi", branch = "master" }
+
 [[tool.uv.index]]
 name = "testpypi"
 url = "https://test.pypi.org/simple/"
