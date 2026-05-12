@@ -12,7 +12,7 @@ nav:
   - Examples:
     - Run processes inside ephemeral docker containers: 'docker-example.md'
   - Presentations:
-    - OGC Builder days Code Sprint May 2026: 'presentations/20260512-ogc-code-sprint/demo.md'
+    - OGC Builder days Code Sprint May 2026: 'presentations/ogc-code-sprint-20260513.md'
     - Geomob Lisbon May 2026: 'presentations/geomoblx-20260506-serving-ogc-api-processes-with-pygeoapi-and-prefect.pdf'
 
 theme:
@@ -22,6 +22,7 @@ theme:
     accent: pink
   features:
     - content.action.edit
+    - content.code.copy
     - content.tabs.link
     - header.autohide
     - navigation.footer
@@ -46,5 +47,6 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
+  - tables
   - toc:
       permalink: true

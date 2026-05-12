@@ -7,13 +7,13 @@ hide:
 
 ## Installation
 
-In time, this will be on the [Python Package Index]() but for now you need to use the
-repository url to get it:
+pygeoapi-prefect is available on the [Python Package Index](https://pypi.org/project/pygeoapi-prefect/) and is thus
+easily installable with common Python package management tools.
 
 === "uv"
 
     ```shell
-    uv add https://github.com/geobeyond/pygeoapi-prefect --branch main
+    uv add pygeoapi-prefect
     ```
 
 === "pip"
@@ -26,7 +26,7 @@ repository url to get it:
     source .venv/bin/activate
 
     # perform installation
-    pip install https://github.com/geobeyond/pygeoapi-prefect@main
+    pip install pygeoapi-prefect
     ```
 
 
@@ -75,9 +75,9 @@ Then start a local Prefect server
    This will start up a local Prefect server listening on port 4200. The Prefect UI becomes available at
    `http://localhost:4200`
 
-Prefect is a very flexible platform and can be set up and configured in many ways. The only hard requirement 
-for pygeoapi-prefect is that Prefect's result management facilities are enabled. Please consult the 
-[Prefect documentation](https://docs.prefect.io/v3/get-started) and the [examples section](docker-example.md) for 
+Prefect is a very flexible platform and can be set up and configured in many ways. The only hard requirement
+for pygeoapi-prefect is that Prefect's result management facilities are enabled. Please consult the
+[Prefect documentation](https://docs.prefect.io/v3/get-started) and the [examples section](docker-example.md) for
 further configuration info.
 
 
@@ -165,22 +165,22 @@ In order to be runnable via pygeoapi, your flows need to:
             outputs: dict | None = None,
         ) -> None: ...
     ```
-  
-2.  The flow must have at least one Prefect task, which is where the processing output is be generated. This task 
-    must return the generated output, which enables it to be managed by 
-    [Prefect's result management facilities](https://docs.prefect.io/v3/advanced/results). This means this 
+
+2.  The flow must have at least one Prefect task, which is where the processing output is be generated. This task
+    must return the generated output, which enables it to be managed by
+    [Prefect's result management facilities](https://docs.prefect.io/v3/advanced/results). This means this
     result-generating task must:
 
     -   Be configured to persist results;
-    -   Be configured with a result storage key that uses the pygeoapi job id - this is needed in order to ensure 
+    -   Be configured with a result storage key that uses the pygeoapi job id - this is needed in order to ensure
         pygeoapi is able to reconstruct the result's storage key for retrieval;
-    -   The generated output must be a two-element tuple where the first element is the media type and the second 
+    -   The generated output must be a two-element tuple where the first element is the media type and the second
         element is the actual output.
 
-3.  The flow must already have been deployed in your Prefect environment. You can use any of the Prefect deployment 
+3.  The flow must already have been deployed in your Prefect environment. You can use any of the Prefect deployment
     types (local processes, docker containers, k8s, etc.). Check the [examples](docker-example.md) section for more information
 
-4.  Your pygeoapi configuration for the process needs to include a `prefect` section, with `deployment` and `metadata` 
+4.  Your pygeoapi configuration for the process needs to include a `prefect` section, with `deployment` and `metadata`
     sub-sections.
 
 This means that a very minimal flow looks like this:
@@ -190,8 +190,8 @@ from prefect import flow, task
 
 @flow()
 def my_custom_flow(
-    processor_id: str, 
-    pygeoapi_job_id: str, 
+    processor_id: str,
+    pygeoapi_job_id: str,
     inputs: dict,
     outputs: dict | None = None
 ) -> None:
